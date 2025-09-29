@@ -1,0 +1,13 @@
+{
+  "domain": "meal_planner",
+  "name": "Basic Meal Planner",
+  "version": "3.0.0",
+  "documentation": "https://github.com/your/repo",
+  "issue_tracker": "https://github.com/your/repo/issues",
+  "codeowners": [
+    "@xclusivgaming"
+  ],
+  "requirements": [],
+  "config_flow": true,
+  "iot_class": "local_push"
+}

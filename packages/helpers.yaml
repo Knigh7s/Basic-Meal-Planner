@@ -1,0 +1,12 @@
+# Home Assistant Package: Meal Planner helpers
+input_select:
+  meal_planner_week_start:
+    name: Meal Planner Week Start
+    options: [Sunday, Monday]
+    icon: mdi:calendar-start
+    initial: Sunday
+  meal_planner_layout:
+    name: Meal Planner Layout
+    options: [Horizontal, Vertical]
+    icon: mdi:table
+    initial: Horizontal

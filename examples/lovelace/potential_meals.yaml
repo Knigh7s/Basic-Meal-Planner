@@ -1,0 +1,12 @@
+# Potential Meals
+type: markdown
+title: Potential Meals
+content: |-
+  {% set items = state_attr('sensor.meal_planner_potential', 'items') or [] %}
+  {% if items | length == 0 %}
+  _No potential meals yet._
+  {% else %}
+  {% for name in items | sort %}
+  - {{ name }}
+  {% endfor %}
+  {% endif %}

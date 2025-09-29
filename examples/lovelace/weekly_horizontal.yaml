@@ -1,0 +1,25 @@
+# Weekly Meal Plan (Horizontal)
+type: markdown
+title: Weekly Meal Plan
+content: |-
+  {% set wk = state_attr('sensor.meal_planner_week', 'days') or {} %}
+  {% set order = ['sun','mon','tue','wed','thu','fri','sat'] %}
+  <table>
+    <thead>
+      <tr>
+        <th>Meal</th>
+        {% for k in order %}<th>{{ wk.get(k,{}).label if wk.get(k) else k|upper }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for slot in ['breakfast','lunch','dinner'] %}
+      <tr>
+        <td><b>{{ slot.title() }}</b></td>
+        {% for k in order %}
+        {% set val = (wk.get(k,{}).get(slot,'')) %}
+        <td>{% if val %}{{ val }}{% else %}<span style="opacity:.4;">—</span>{% endif %}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
