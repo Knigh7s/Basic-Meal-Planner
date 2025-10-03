@@ -327,7 +327,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         }))
         connection.send_result(msg["id"], {"queued": True})
 
-    # ---------- Serve static admin panel (AWAIT this call) ----------
+        # ---------- Serve static admin panel ----------
     panel_dir = Path(__file__).parent / "panel"
     await hass.http.async_register_static_paths([
         StaticPathConfig(
@@ -342,23 +342,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     panel_id = "meal-planner"
     add_sidebar = entry.options.get("add_sidebar", True)
 
-    # Best-effort remove (safe if it doesn't exist)
+    # Remove existing panel if any (safe to ignore failures)
     try:
         await async_remove_panel(hass, panel_id)
     except Exception:
         pass
 
-    # If you really want a redirect for bare /meal-planner -> index.html, you can keep it,
-    # but it's optional and can warn if re-registered on reloads. Safe to remove.
-    # try:
-    #     hass.http.register_redirect("/meal-planner", "/meal-planner/index.html")
-    #     _LOGGER.info("Meal Planner: redirect set /meal-planner → /meal-planner/index.html")
-    # except Exception as e:
-    #     _LOGGER.warning("Meal Planner: redirect already set or not needed: %s", e)
-
     if add_sidebar:
         try:
-            # NOTE: no 'await' here — this is NOT an awaitable
+            # ✅ DO NOT AWAIT THIS
             async_register_built_in_panel(
                 hass,
                 component_name="html",
@@ -374,5 +366,5 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     else:
         _LOGGER.info("Meal Planner: sidebar option disabled; panel not registered")
 
-    # <-- make sure this is the last line in async_setup_entry, not inside any 'if/else'
+    # ✅ Always end async_setup_entry with a plain True
     return True
