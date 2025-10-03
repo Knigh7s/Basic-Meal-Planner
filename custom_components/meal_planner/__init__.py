@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+from homeassistant.components.http import StaticPathConfig
+from pathlib import Path
 from datetime import datetime, timedelta, date
 from pathlib import Path
 from typing import Optional
@@ -247,7 +249,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         connection.send_result(msg["id"], {"queued": True})
 
     # Serve static admin panel
-    hass.http.register_static_path("/meal-planner", str(Path(__file__).parent / "panel"), True)
+    panel_dir = Path(__file__).parent / "panel"
+    hass.http.async_register_static_paths([
+    StaticPathConfig(
+        url_path="/meal-planner",
+        path=str(panel_dir),
+        cache_headers=True,  # ok to keep True for panel assets
+    )
+])
 
     # Sidebar toggle (default ON)
     add_sidebar = entry.options.get("add_sidebar", True)

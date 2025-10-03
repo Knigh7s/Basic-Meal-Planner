@@ -1,11 +1,11 @@
 {
   "domain": "meal_planner",
   "name": "Basic Meal Planner",
-  "version": "3.0.0",
-  "documentation": "https://github.com/your/repo",
-  "issue_tracker": "https://github.com/your/repo/issues",
+  "version": "0.0.2",
+  "documentation": "https://github.com/Knigh7s/Basic-Meal-Planner-HACS",
+  "issue_tracker": "https://github.com/Knigh7s/Basic-Meal-Planner-HACS/issues",
   "codeowners": [
-    "@xclusivgaming"
+    "@Knigh7s"
   ],
   "requirements": [],
   "config_flow": true,
