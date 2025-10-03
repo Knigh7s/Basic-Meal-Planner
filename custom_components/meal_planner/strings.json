@@ -3,8 +3,12 @@
     "step": {
       "user": {
         "title": "Basic Meal Planner",
-        "description": "Press Submit"
+        "description": "Press Submit to add the Meal Planner resources.",
+        "data": {}
       }
+    },
+    "abort": {
+      "already_configured": "Already configured."
     }
   }
 }

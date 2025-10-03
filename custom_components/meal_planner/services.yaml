@@ -1,2 +1,78 @@
 add:
   name: Add meal
+  description: Add a meal (blank date = Potential). Optional recipe link & notes are surfaced in the admin panel.
+  fields:
+    name:
+      required: true
+      example: "Chicken Alfredo"
+      selector:
+        text:
+    meal_time:
+      required: true
+      example: "Dinner"
+      selector:
+        select:
+          options:
+            - Breakfast
+            - Lunch
+            - Dinner
+    date:
+      required: false
+      example: "2025-10-31"
+      selector:
+        date:
+    recipe_url:
+      required: false
+      example: "https://example.com/alfredo"
+      selector:
+        text:
+    notes:
+      required: false
+      example: "Use gluten-free pasta"
+      selector:
+        text:
+
+bulk:
+  name: Bulk action
+  description: Run a bulk action on selected items.
+  fields:
+    action:
+      required: true
+      example: "convert_to_potential | assign_date | delete"
+      selector:
+        select:
+          options:
+            - convert_to_potential
+            - assign_date
+            - delete
+    ids:
+      required: true
+      example: ["a1b2c3", "d4e5f6"]
+      selector:
+        object:
+    date:
+      required: false
+      example: "2025-11-01"
+      selector:
+        date:
+    meal_time:
+      required: false
+      example: "Dinner"
+      selector:
+        select:
+          options:
+            - Breakfast
+            - Lunch
+            - Dinner
+
+clear_potential:
+  name: Clear potential meals
+  description: Clears all unscheduled (no-date) meals.
+
+clear_week:
+  name: Clear current week
+  description: Clears scheduled meals whose dates fall within the current week.
+
+promote_future_to_week:
+  name: Promote future to week
+  description: No-op for unified model; kept for compatibility.
