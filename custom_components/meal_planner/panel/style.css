@@ -7,6 +7,7 @@ header h1{margin:0}
 button{border:none;padding:8px 12px;border-radius:8px;background:#3a86ff;color:#fff;cursor:pointer}
 button[disabled]{opacity:.5;cursor:not-allowed}
 button:hover{opacity:.9}
+#btn-add{border:none;padding:8px 12px;border-radius:8px;background:green;color:#fff;cursor:pointer}
 select,input,textarea{background:#1a1c1f;color:#e7e7e7;border:1px solid #2b2f33;border-radius:6px;padding:6px 8px}
 input.hidden,select.hidden{display:none}
 table{width:100%;border-collapse:collapse;margin-top:12px}
