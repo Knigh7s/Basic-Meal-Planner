@@ -137,7 +137,7 @@ class WeeklyMealsSensor(SensorEntity):
                 mapping = {6: "sun", 0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat"}
                 k = mapping[d.weekday()]
                 slot = (m.get("meal_time") or "Dinner").strip().lower()
-                if slot in ("breakfast", "lunch", "dinner", "snack'):
+                if slot in ("breakfast", "lunch", "dinner", "snack"):
                     grid[k][slot] = m.get("name", "")
 
         self._attr_native_value = f"{start.isoformat()} to {end.isoformat()}"
@@ -236,31 +236,37 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         action = (call.data.get("action") or "").lower()
         ids = list(call.data.get("ids") or [])
         date_str = (call.data.get("date") or "").strip()
-        meal_time = (call.data.get("meal_time") or "").strip().title() or None
+        meal_time_in = (call.data.get("meal_time") or "").strip().title() or None
+
         if action not in ("convert_to_potential", "assign_date", "delete"):
             return
+
         idset = set(ids)
         new_list = []
-        if meal_time in ("Breakfast", "Lunch", "Dinner", "Snack"):
-            m["meal_time"] = meal_time
+
         for m in data["scheduled"]:
             if m["id"] not in idset:
                 new_list.append(m)
                 continue
+
             if action == "convert_to_potential":
                 m["date"] = ""
                 new_list.append(m)
+
             elif action == "assign_date":
                 if date_str:
                     m["date"] = date_str
-                if meal_time:
-                    m["meal_time"] = meal_time
+                if meal_time_in in ("Breakfast", "Lunch", "Dinner", "Snack"):
+                    m["meal_time"] = meal_time_in
                 new_list.append(m)
+
             elif action == "delete":
-                # skip (deleting)
+                # drop this row (do not append)
                 pass
+
         data["scheduled"] = new_list
         await _save_and_notify()
+
 
     hass.services.async_register(DOMAIN, "bulk", svc_bulk)
 
@@ -368,4 +374,5 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         pass
     hass.data.pop(DOMAIN, None)
     return True
+
 
