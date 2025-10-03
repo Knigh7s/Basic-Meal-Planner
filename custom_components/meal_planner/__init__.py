@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import logging
@@ -66,9 +65,25 @@ class PotentialMealsSensor(SensorEntity):
         self.hass = hass
         self.store = store
         self.data = data
+        # unique per config entry to avoid collisions
         self._attr_unique_id = f"{entry_id}_meal_planner_potential"
         self._recalc()
-    ...
+
+    def _recalc(self) -> None:
+        # All unscheduled (no date) meal names, alphabetized case-insensitively
+        items = [
+            (m.get("name") or "")
+            for m in self.data.get("scheduled", [])
+            if not (m.get("date") or "").strip()
+        ]
+        items = [i for i in items if i]
+        self._attr_native_value = len(items)
+        self._attr_extra_state_attributes = {"items": sorted(items, key=lambda s: s.lower())}
+
+    async def async_update_from_data(self) -> None:
+        self._recalc()
+        self.async_write_ha_state()
+
 
 class WeeklyMealsSensor(SensorEntity):
     _attr_name = "Meal Planner Weekly View"
@@ -81,7 +96,52 @@ class WeeklyMealsSensor(SensorEntity):
         self.data = data
         self._attr_unique_id = f"{entry_id}_meal_planner_week"
         self._recalc()
-    ...
+
+    def _recalc(self) -> None:
+        today = datetime.now().date()
+        week_start = self.data.get("settings", {}).get("week_start", "Sunday")
+        start, end = _current_week_bounds(today, week_start)
+
+        # Init week grid
+        days_order = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
+        day_labels = {
+            "sun": "Sun", "mon": "Mon", "tue": "Tue", "wed": "Wed",
+            "thu": "Thu", "fri": "Fri", "sat": "Sat"
+        }
+        grid = {
+            k: {"label": day_labels[k], "breakfast": "", "lunch": "", "dinner": ""}
+            for k in days_order
+        }
+
+        # Fill grid from scheduled meals inside this week
+        for m in self.data.get("scheduled", []):
+            ds = (m.get("date") or "").strip()
+            if not ds:
+                continue
+            try:
+                d = datetime.strptime(ds, "%Y-%m-%d").date()
+            except Exception:
+                continue
+
+            if start <= d <= end:
+                # Python weekday: Mon=0..Sun=6 → map to our keys
+                mapping = {6: "sun", 0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat"}
+                k = mapping[d.weekday()]
+                slot = (m.get("meal_time") or "Dinner").strip().lower()
+                if slot in ("breakfast", "lunch", "dinner"):
+                    grid[k][slot] = m.get("name", "")
+
+        self._attr_native_value = f"{start.isoformat()} to {end.isoformat()}"
+        self._attr_extra_state_attributes = {
+            "week_start": week_start,
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "days": grid,
+        }
+
+    async def async_update_from_data(self) -> None:
+        self._recalc()
+        self.async_write_ha_state()
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
