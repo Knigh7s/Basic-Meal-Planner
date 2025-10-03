@@ -7,7 +7,7 @@
   "domains": [
     "meal_planner"
   ],
-  "homeassistant": "2024.6.0",
+  "homeassistant": "2024.7.0",
   "categories": [
     "integration"
   ]
