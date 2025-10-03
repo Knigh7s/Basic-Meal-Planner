@@ -9,5 +9,6 @@
   "config_flow": true,
   "iot_class": "local_push",
   "dependencies": ["frontend"],  
-  "integration_type": "hub"
+  "integration_type": "hub",
+  "icon": "mdi:silverware-fork-knife"
 }
