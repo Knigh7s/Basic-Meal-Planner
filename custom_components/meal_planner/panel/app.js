@@ -1,3 +1,29 @@
+// =====================
+// HA Connection Helper
+// =====================
+async function getHAConnection() {
+  if (window.parent && window.parent.hassConnection) {
+    return window.parent.hassConnection;
+  }
+  throw new Error("Open this from the HA sidebar so authentication is handled.");
+}
+
+async function haWS(msg) {
+  const conn = await getHAConnection();
+  if (!conn.sendMessagePromise) {
+    throw new Error("HA connection not ready (sendMessagePromise missing)");
+  }
+  return conn.sendMessagePromise(msg);
+}
+
+// =====================
+// App code starts here
+// =====================
+
+// Example: load table after page load
+window.addEventListener("DOMContentLoaded", () => {
+  loadMealsTable();
+});
 
 async function getWS() {
   if (window.hassConnection) {
