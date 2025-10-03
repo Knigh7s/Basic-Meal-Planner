@@ -52,16 +52,6 @@ A simple, **zero-dependency** meal planning integration for Home Assistant with 
 
 ---
 
-## 🧲 Sidebar Button (Toggle)
-After installing:
-- Home Assistant → **Settings → Devices & Services → Integrations → Basic Meal Planner → Configure**.
-- Enable **“Add ‘Meal Planner’ to sidebar”**. *(Default: ON)*
-- This adds a **Meal Planner** button to the sidebar that opens the admin dashboard.
-
-> Prefer manual control? Add a **Webpage** panel pointing to `/meal-planner`.
-
----
-
 ## 🧩 Lovelace Examples (included in `/examples/lovelace/`)
 
 - `weekly_horizontal.yaml` — Weekly view with **days across the top**.
@@ -71,34 +61,3 @@ After installing:
 Use **Add Card → Markdown** and paste the content from these files.
 
 ---
-
-## 📦 Helpers Package (included in `/packages/helpers.yaml`)
-
-Creates two helpers used by your weekly cards:
-- `input_select.meal_planner_week_start` → **Sunday** | **Monday**
-- `input_select.meal_planner_layout` → **Horizontal** | **Vertical**
-
-To use the package, enable packages in `configuration.yaml`:
-```yaml
-homeassistant:
-  packages: !include_dir_named packages
-```
-Then copy `packages/helpers.yaml` into your HA `/config/packages/` directory and restart HA.
-
----
-
-## 🧪 Quick Test
-- Add a meal without a date → it appears as **Potential** (and on the Potential Meals card).
-- Add a meal with a date this week → it appears in the Weekly card in the relevant day/slot.
-- Toggle “Hide past week” on the admin dashboard to see it filter the list.
-
----
-
-## 📄 License
-This project is licensed under the **MIT License**. See `LICENSE`.
-
-MIT is permissive: others can use/modify your code (even commercially) as long as they keep your copyright + license notice.
-
----
-
-Enjoy! 🎉
