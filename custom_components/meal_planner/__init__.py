@@ -327,7 +327,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         }))
         connection.send_result(msg["id"], {"queued": True})
 
-        # ---------- Serve static admin panel ----------
+    # ---------- Serve static admin panel (keep this as you already have it) ----------
     panel_dir = Path(__file__).parent / "panel"
     await hass.http.async_register_static_paths([
         StaticPathConfig(
@@ -338,11 +338,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ])
     _LOGGER.info("Meal Planner: static panel served at /meal-planner from %s", panel_dir)
 
-    # ---------- Sidebar (HTML panel) ----------
+    # ---------- Optional: redirect /meal-planner → /meal-planner/index.html ----------
+    try:
+        # Safe: if it’s already present HA may warn; we ignore
+        hass.http.register_redirect("/meal-planner", "/meal-planner/index.html")
+        _LOGGER.info("Meal Planner: redirect set /meal-planner → /meal-planner/index.html")
+    except Exception as e:
+        _LOGGER.debug("Meal Planner: redirect already present or not needed: %s", e)
+
+    # ---------- Sidebar (iframe panel pointing to the HTML file) ----------
     panel_id = "meal-planner"
     add_sidebar = entry.options.get("add_sidebar", True)
 
-    # Remove existing panel if any (safe to ignore failures)
     try:
         await async_remove_panel(hass, panel_id)
     except Exception:
@@ -350,21 +357,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     if add_sidebar:
         try:
-            # ✅ DO NOT AWAIT THIS
+            # NOTE: do NOT await this; it is synchronous
             async_register_built_in_panel(
                 hass,
-                component_name="html",
+                component_name="iframe",
                 sidebar_title="Meal Planner",
                 sidebar_icon="mdi:silverware-fork-knife",
                 frontend_url_path=panel_id,
-                config={"html_url": "/meal-planner/index.html"},
+                config={"url": "/meal-planner/index.html"},
                 require_admin=False,
             )
-            _LOGGER.info("Meal Planner: HTML sidebar panel '%s' registered", panel_id)
+            _LOGGER.info("Meal Planner: iframe sidebar panel '%s' registered", panel_id)
         except Exception as e:
-            _LOGGER.error("Meal Planner: failed to register HTML sidebar panel: %s", e)
+            _LOGGER.error("Meal Planner: failed to register iframe sidebar panel: %s", e)
     else:
         _LOGGER.info("Meal Planner: sidebar option disabled; panel not registered")
 
-    # ✅ Always end async_setup_entry with a plain True
+    # Important: always finish with True
     return True
