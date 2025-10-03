@@ -347,6 +347,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception:
         pass
 
+    # ---------- Redirect /meal-planner -> /meal-planner/index.html ----------
+    try:
+        hass.http.register_redirect("/meal-planner", "/meal-planner/index.html")
+        _LOGGER.info("Meal Planner: redirect set /meal-planner → /meal-planner/index.html")
+    except Exception as e:
+        _LOGGER.error("Meal Planner: failed to set redirect: %s", e)
+
+# ---------- Sidebar Panel ----------
+
     if add_sidebar:
         try:
             await async_register_built_in_panel(
@@ -375,6 +384,3 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         pass
     hass.data.pop(DOMAIN, None)
     return True
-
-
-
