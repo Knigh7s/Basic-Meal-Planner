@@ -1,146 +1,154 @@
 <!doctype html>
 <html>
+
 <head>
-  <meta charset="utf-8">
-  <title>Meal Planner</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="./style.css">
+    <meta charset="utf-8">
+    <title>Meal Planner</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="./style.css">
 </head>
+
 <body>
-  <div id="app">
-    <header>
-      <h1>🍽️ Meal Planner</h1>
-      <div class="actions">
-        <button id="btn-add">Add Meal</button>
-        <div class="spacer"></div>
-        <label class="chk"><input id="hidePast" type="checkbox" checked> Hide past week</label>
-        <label>Filter:
-          <select id="filterType">
-            <option value="none">None</option>
-            <option value="week">Week</option>
-            <option value="month">Month</option>
-          </select>
-        </label>
-        <input id="weekPicker" type="week" class="hidden">
-        <input id="monthPicker" type="month" class="hidden">
-        <button id="btn-showall">Show All</button>
-        <div class="spacer"></div>
-        <select id="bulkAction">
-          <option value="">Bulk Actions…</option>
-          <option value="convert_to_potential">Convert to Potential (clear date)</option>
-          <option value="assign_date">Assign date…</option>
-          <option value="delete">Delete</option>
-        </select>
-        <input id="bulkDate" type="date" class="hidden">
-        <select id="bulkTime" class="hidden">
-          <option>Breakfast</option>
-          <option>Lunch</option>
-          <option selected>Dinner</option>
-          <option>Snack</option>
-        </select>
-        <button id="btn-apply" disabled>Apply</button>
-      </div>
-    </header>
+    <div id="app">
+        <header>
+            <h1>🍽️ Meal Planner</h1>
+            <div class="actions">
+                <button id="btn-add">Add Meal</button>
+                <div class="spacer"></div>
+                <label class="chk"><input id="hidePast" type="checkbox" checked> Hide past week</label>
+                <label>Filter:
+                    <select id="filterType">
+                        <option value="none">None</option>
+                        <option value="week">Week</option>
+                        <option value="month">Month</option>
+                    </select>
+                </label>
+                <input id="weekPicker" type="week" class="hidden">
+                <input id="monthPicker" type="month" class="hidden">
+                <button id="btn-showall">Show All</button>
+                <div class="spacer"></div>
+                <select id="bulkAction">
+                    <option value="">Bulk Actions…</option>
+                    <option value="convert_to_potential">Convert to Potential (clear date)</option>
+                    <option value="assign_date">Assign date…</option>
+                    <option value="delete">Delete</option>
+                </select>
+                <input id="bulkDate" type="date" class="hidden">
+                <select id="bulkTime" class="hidden">
+                    <option>Breakfast</option>
+                    <option>Lunch</option>
+                    <option selected>Dinner</option>
+                    <option>Snack</option>
+                </select>
+                <button id="btn-apply" disabled>Apply</button>
+            </div>
+        </header>
 
-    <section>
-      <h2>All Meals</h2>
-      <table id="allTable">
-        <thead>
-          <tr><th class="narrow"><input type="checkbox" id="selectAll"></th><th>Name</th><th>Status</th><th>Recipe</th><th>Notes</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </section>
+        <section>
+            <h2>All Meals</h2>
+            <table id="allTable">
+                <thead>
+                    <tr>
+                        <th class="narrow"><input type="checkbox" id="selectAll"></th>
+                        <th>Name</th>
+                        <th>Status</th>
+                        <th>Recipe</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </section>
 
-    <!-- Modal: Add Meal -->
-    <div id="modal" class="modal hidden">
-      <div class="modal-card">
-        <h3>Add Meal</h3>
-        <label>Name
-          <input id="m_name" list="meal_options" type="text" placeholder="e.g., Chicken Alfredo">
-          <datalist id="meal_options"></datalist>
-        </label>
-        <label>Date <input id="m_date" type="date"></label>
-        <label>Meal Time
-          <select id="m_time">
-            <option>Breakfast</option>
-            <option>Lunch</option>
-            <option selected>Dinner</option>            
-            <option>Snack</option>
-          </select>
-        </label>
-        <label>Recipe link (optional)
-          <input id="m_recipe" type="url" placeholder="https://...">
-        </label>
-        <label>Notes (optional)
-          <textarea id="m_notes" rows="3" placeholder="Any details to remember"></textarea>
-        </label>
-        <div class="modal-actions">
-          <button id="save">Save</button>
-          <button id="cancel">Cancel</button>
+        <!-- Modal: Add Meal -->
+        <div id="modal" class="modal hidden">
+            <div class="modal-card">
+                <h3>Add Meal</h3>
+                <label>Name
+                    <input id="meal_name" list="meal_options" type="text" placeholder="e.g., Chicken Alfredo">
+                    <datalist id="meal_options"></datalist>
+                </label>
+                <label>Date <input id="meal_date" type="date"></label>
+                <label>Meal Time
+                    <select id="meal_time">
+                        <option>Breakfast</option>
+                        <option>Lunch</option>
+                        <option selected>Dinner</option>
+                        <option>Snack</option>
+                    </select>
+                </label>
+                <label>Recipe link (optional)
+                    <input id="meal_recipe" type="url" placeholder="https://...">
+                </label>
+                <label>Notes (optional)
+                    <textarea id="meal_notes" rows="3" placeholder="Any details to remember"></textarea>
+                </label>
+                <div class="modal-actions">
+                    <button id="save" onclick="saveMeal()">Save</button>
+                    <button id="cancel">Cancel</button>
+                </div>
+            </div>
         </div>
-      </div>
+
     </div>
 
-  </div>
+    <script>
+        async function haWS(msg) {
+            // Works in the HA iframe: use the parent connection
+            const conn = await window.parent.hassConnection;
+            // sendMessagePromise resolves when backend replies
+            return conn.sendMessagePromise(msg);
+        }
+    </script>
+    <script>
+        async function saveMeal() {
+            const nameEl = document.getElementById('meal-name');
+            const dateEl = document.getElementById('meal-date');
+            const timeEl = document.getElementById('meal-time');   // select: Breakfast/Lunch/Dinner/Snack
+            const linkEl = document.getElementById('meal-link');
+            const notesEl = document.getElementById('meal-notes');
 
-  <script>
-async function haWS(msg) {
-  // Works in the HA iframe: use the parent connection
-  const conn = await window.parent.hassConnection;
-  // sendMessagePromise resolves when backend replies
-  return conn.sendMessagePromise(msg);
-}
-</script>
-  <script>
-async function saveMeal() {
-  const nameEl = document.getElementById('meal-name');
-  const dateEl = document.getElementById('meal-date');
-  const timeEl = document.getElementById('meal-time');   // select: Breakfast/Lunch/Dinner/Snack
-  const linkEl = document.getElementById('meal-link');
-  const notesEl = document.getElementById('meal-notes');
+            const name = (nameEl?.value || '').trim();
+            if (!name) {
+                alert('Please enter a meal name.');
+                nameEl?.focus();
+                return;
+            }
 
-  const name = (nameEl?.value || '').trim();
-  if (!name) {
-    alert('Please enter a meal name.');
-    nameEl?.focus();
-    return;
-  }
+            const payload = {
+                type: 'meal_planner/add',
+                name,
+                meal_time: (timeEl?.value || 'Dinner'),
+                date: (dateEl?.value || ''),          // blank = Potential Meal
+                recipe_url: (linkEl?.value || ''),
+                notes: (notesEl?.value || '')
+            };
 
-  const payload = {
-    type: 'meal_planner/add',
-    name,
-    meal_time: (timeEl?.value || 'Dinner'),
-    date: (dateEl?.value || ''),          // blank = Potential Meal
-    recipe_url: (linkEl?.value || ''),
-    notes: (notesEl?.value || '')
-  };
+            // Disable button to prevent double submits
+            const btn = document.getElementById('saveMeal');
+            btn && (btn.disabled = true);
 
-  // Disable button to prevent double submits
-  const btn = document.getElementById('saveMeal');
-  btn && (btn.disabled = true);
+            try {
+                await haWS(payload);                   // <-- calls your backend ws handler
+                closeAddModal && closeAddModal();      // if you have a helper to close modal
+                await loadMealsTable();                // re-fetch and render the table
+            } catch (e) {
+                console.error('Save failed', e);
+                alert('Unable to save meal. See browser console for details.');
+            } finally {
+                btn && (btn.disabled = false);
+            }
+        }
 
-  try {
-    await haWS(payload);                   // <-- calls your backend ws handler
-    closeAddModal && closeAddModal();      // if you have a helper to close modal
-    await loadMealsTable();                // re-fetch and render the table
-  } catch (e) {
-    console.error('Save failed', e);
-    alert('Unable to save meal. See browser console for details.');
-  } finally {
-    btn && (btn.disabled = false);
-  }
-}
+        // Example: reload table from backend
+        async function loadMealsTable() {
+            const resp = await haWS({ type: 'meal_planner/get' });
+            // resp = { settings, rows, library }
+            // Render your table rows from resp.rows here...
+        }
+    </script>
 
-// Example: reload table from backend
-async function loadMealsTable() {
-  const resp = await haWS({ type: 'meal_planner/get' });
-  // resp = { settings, rows, library }
-  // Render your table rows from resp.rows here...
-}
-</script>
-
-
-  <script src="./app.js"></script>
+    <script src="./app.js"></script>
 </body>
+
 </html>
