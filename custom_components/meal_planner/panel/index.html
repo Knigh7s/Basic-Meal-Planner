@@ -82,6 +82,63 @@
 
   </div>
 
+  <script>
+async function haWS(msg) {
+  // Works in the HA iframe: use the parent connection
+  const conn = await window.parent.hassConnection;
+  // sendMessagePromise resolves when backend replies
+  return conn.sendMessagePromise(msg);
+}
+</script>
+  <script>
+async function saveMeal() {
+  const nameEl = document.getElementById('meal-name');
+  const dateEl = document.getElementById('meal-date');
+  const timeEl = document.getElementById('meal-time');   // select: Breakfast/Lunch/Dinner/Snack
+  const linkEl = document.getElementById('meal-link');
+  const notesEl = document.getElementById('meal-notes');
+
+  const name = (nameEl?.value || '').trim();
+  if (!name) {
+    alert('Please enter a meal name.');
+    nameEl?.focus();
+    return;
+  }
+
+  const payload = {
+    type: 'meal_planner/add',
+    name,
+    meal_time: (timeEl?.value || 'Dinner'),
+    date: (dateEl?.value || ''),          // blank = Potential Meal
+    recipe_url: (linkEl?.value || ''),
+    notes: (notesEl?.value || '')
+  };
+
+  // Disable button to prevent double submits
+  const btn = document.getElementById('saveMeal');
+  btn && (btn.disabled = true);
+
+  try {
+    await haWS(payload);                   // <-- calls your backend ws handler
+    closeAddModal && closeAddModal();      // if you have a helper to close modal
+    await loadMealsTable();                // re-fetch and render the table
+  } catch (e) {
+    console.error('Save failed', e);
+    alert('Unable to save meal. See browser console for details.');
+  } finally {
+    btn && (btn.disabled = false);
+  }
+}
+
+// Example: reload table from backend
+async function loadMealsTable() {
+  const resp = await haWS({ type: 'meal_planner/get' });
+  // resp = { settings, rows, library }
+  // Render your table rows from resp.rows here...
+}
+</script>
+
+
   <script src="./app.js"></script>
 </body>
 </html>
