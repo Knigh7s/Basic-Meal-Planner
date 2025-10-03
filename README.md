@@ -1,4 +1,4 @@
-# 🍽️ Basic Meal Planner (HACS Integration)
+# 🍽️ Basic Meal Planner
 
 A simple, **zero-dependency** meal planning integration for Home Assistant with an **admin dashboard** and Lovelace support.
 
