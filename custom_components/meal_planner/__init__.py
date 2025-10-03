@@ -287,26 +287,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Sidebar toggle (default ON)
     add_sidebar = entry.options.get("add_sidebar", True)
     panel_id = "meal-planner"
-    if add_sidebar:
-        try:
-            await hass.components.frontend.async_register_built_in_panel(
-                component_name="iframe",
-                sidebar_title="Meal Planner",
-                sidebar_icon="mdi:silverware-fork-knife",
-                frontend_url_path="meal-planner",
-                config={"url": "/meal-planner"},
-                require_admin=False,
-            )
-        except Exception as e:
-            _LOGGER.debug("Sidebar register error: %s", e)
-    else:
-        try:
-            await hass.components.frontend.async_remove_panel(panel_id)
-        except Exception:
-            pass
 
-    _LOGGER.info("Meal Planner panel served at /meal-planner")
-    return True
+try:
+    await hass.components.frontend.async_remove_panel(panel_id)
+except Exception:
+    pass
+
+add_sidebar = entry.options.get("add_sidebar", True)
+if add_sidebar:
+    try:
+        await hass.components.frontend.async_register_built_in_panel(
+            component_name="iframe",
+            sidebar_title="Meal Planner",
+            sidebar_icon="mdi:silverware-fork-knife",
+            frontend_url_path=panel_id,
+            config={"url": "/meal-planner"},
+            require_admin=False,
+        )
+        _LOGGER.info("Meal Planner: sidebar panel '%s' registered", panel_id)
+    except Exception as e:
+        _LOGGER.error("Meal Planner: failed to register sidebar panel: %s", e)
+else:
+    _LOGGER.info("Meal Planner: sidebar option disabled; panel not registered")
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Attempt to remove panel on unload
