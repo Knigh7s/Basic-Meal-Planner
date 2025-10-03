@@ -351,20 +351,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         try:
             await async_register_built_in_panel(
                 hass,
-                component_name="iframe",
+                component_name="html",
                 sidebar_title="Meal Planner",
                 sidebar_icon="mdi:silverware-fork-knife",
                 frontend_url_path=panel_id,
-                config={"url": "/meal-planner/index.html"},
+                config={"html_url": "/meal-planner/index.html"},
                 require_admin=False,
             )
-            _LOGGER.info("Meal Planner: sidebar panel '%s' registered", panel_id)
+            _LOGGER.info("Meal Planner: HTML sidebar panel '%s' registered", panel_id)
         except Exception as e:
-            _LOGGER.error("Meal Planner: failed to register sidebar panel: %s", e)
+            _LOGGER.error("Meal Planner: failed to register HTML sidebar panel: %s", e)
     else:
         _LOGGER.info("Meal Planner: sidebar option disabled; panel not registered")
 
-    return True
+
+        return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -374,5 +375,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         pass
     hass.data.pop(DOMAIN, None)
     return True
+
 
 
