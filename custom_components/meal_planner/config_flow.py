@@ -7,25 +7,16 @@ import voluptuous as vol
 from .const import DOMAIN
 
 class MealPlannerConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Create the integration entry (single instance)."""
     VERSION = 1
 
     async def async_step_user(self, user_input=None) -> FlowResult:
-        # Only allow one entry
         if self._async_current_entries():
             return self.async_abort(reason="already_configured")
-
         if user_input is not None:
-            # No data to store; options handled in OptionsFlow
             return self.async_create_entry(title="Basic Meal Planner", data={})
-
-        # Show empty form to let user click Submit
         return self.async_show_form(step_id="user", data_schema=vol.Schema({}))
 
-
 class MealPlannerOptionsFlow(OptionsFlow):
-    """Options flow for toggles like the sidebar button."""
-
     def __init__(self, entry: ConfigEntry) -> None:
         self.entry = entry
 
@@ -41,7 +32,5 @@ class MealPlannerOptionsFlow(OptionsFlow):
         })
         return self.async_show_form(step_id="init", data_schema=schema)
 
-
 async def async_get_options_flow(config_entry: ConfigEntry) -> MealPlannerOptionsFlow:
-    """Expose the options flow to Home Assistant."""
     return MealPlannerOptionsFlow(config_entry)
