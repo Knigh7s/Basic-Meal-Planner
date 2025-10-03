@@ -27,7 +27,7 @@ DEFAULT_DATA = {
     "library": [],    # list of {name, recipe_url, notes}
 }
 
-MEAL_TIME_ORDER = {"Breakfast": 0, "Lunch": 1, "Dinner": 2}
+MEAL_TIME_ORDER = {"Breakfast": 0, "Lunch": 1, "Dinner": 2, "Snack": 3}
 
 
 def _current_week_bounds(today: date, week_start: str) -> tuple[date, date]:
@@ -120,7 +120,7 @@ class WeeklyMealsSensor(SensorEntity):
             "thu": "Thu", "fri": "Fri", "sat": "Sat",
         }
         grid = {
-            k: {"label": day_labels[k], "breakfast": "", "lunch": "", "dinner": ""}
+            k: {"label": day_labels[k], "breakfast": "", "lunch": "", "dinner": "", "snack": ""}
             for k in days_order
         }
 
@@ -137,7 +137,7 @@ class WeeklyMealsSensor(SensorEntity):
                 mapping = {6: "sun", 0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat"}
                 k = mapping[d.weekday()]
                 slot = (m.get("meal_time") or "Dinner").strip().lower()
-                if slot in ("breakfast", "lunch", "dinner"):
+                if slot in ("breakfast", "lunch", "dinner", "snack'):
                     grid[k][slot] = m.get("name", "")
 
         self._attr_native_value = f"{start.isoformat()} to {end.isoformat()}"
@@ -212,6 +212,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async def svc_add(call: ServiceCall):
         name = (call.data.get("name") or "").strip()
         meal_time = (call.data.get("meal_time") or "Dinner").strip().title()
+        if meal_time not in ("Breakfast", "Lunch", "Dinner", "Snack"):
+            meal_time = "Dinner"
         date_str = (call.data.get("date") or "").strip()
         recipe_url = (call.data.get("recipe_url") or "").strip()
         notes = (call.data.get("notes") or "").strip()
@@ -239,6 +241,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             return
         idset = set(ids)
         new_list = []
+        if meal_time in ("Breakfast", "Lunch", "Dinner", "Snack"):
+            m["meal_time"] = meal_time
         for m in data["scheduled"]:
             if m["id"] not in idset:
                 new_list.append(m)
@@ -364,3 +368,4 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         pass
     hass.data.pop(DOMAIN, None)
     return True
+
