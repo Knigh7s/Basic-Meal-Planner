@@ -1,11 +1,8 @@
 {
   "name": "Basic Meal Planner",
   "content_in_root": false,
-  "country": "US",
   "render_readme": true,
-  "zip_release": false,
   "filename": "meal_planner",
-  "hide_default_branch": false,
   "iot_class": "Local Push",
   "domains": [
     "meal_planner"
