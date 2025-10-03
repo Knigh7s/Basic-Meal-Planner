@@ -358,7 +358,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     if add_sidebar:
         try:
-            await async_register_built_in_panel(
+            async_register_built_in_panel(
                 hass,
                 component_name="html",
                 sidebar_title="Meal Planner",
@@ -384,3 +384,4 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         pass
     hass.data.pop(DOMAIN, None)
     return True
+
