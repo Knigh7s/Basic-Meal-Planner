@@ -205,18 +205,18 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   document.getElementById("cancel").addEventListener("click", ()=> document.getElementById("modal").classList.add("hidden"));
   document.getElementById("save").addEventListener("click", async ()=>{
-    const name = document.getElementById("m_name").value.trim();
-    const date = document.getElementById("m_date").value;
-    const time = document.getElementById("m_time").value;
-    const recipe = document.getElementById("m_recipe").value.trim();
-    const notes = document.getElementById("m_notes").value.trim();
+    const name = document.getElementById("meal-name").value.trim();
+    const date = document.getElementById("meal-date").value;
+    const time = document.getElementById("meal-time").value;
+    const recipe = document.getElementById("meal-recipe").value.trim();
+    const notes = document.getElementById("meal-notes").value.trim();
     if (!name){ alert("Please enter a meal name."); return; }
     await addMeal({name, date, meal_time: time, recipe_url: recipe, notes});
-    document.getElementById("m_name").value="";
-    document.getElementById("m_date").value="";
-    document.getElementById("m_time").value="Dinner";
-    document.getElementById("m_recipe").value="";
-    document.getElementById("m_notes").value="";
+    document.getElementById("meal-name").value="";
+    document.getElementById("meal-date").value="";
+    document.getElementById("meal-time").value="Dinner";
+    document.getElementById("meal-recipe").value="";
+    document.getElementById("meal-notes").value="";
     document.getElementById("modal").classList.add("hidden");
     await refresh();
   });
