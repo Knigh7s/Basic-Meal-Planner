@@ -128,11 +128,11 @@ function closeAddModal() {
 
 /* ---- Save handler using your underscore IDs ---- */
 async function saveMeal() {
-  const nameEl  = document.getElementById('meal_name');
-  const dateEl  = document.getElementById('meal_date');
-  const timeEl  = document.getElementById('meal_time');
-  const linkEl  = document.getElementById('meal_recipe');
-  const notesEl = document.getElementById('meal_notes');
+  const nameEl  = document.getElementById('meal-name');
+  const dateEl  = document.getElementById('meal-date');
+  const timeEl  = document.getElementById('meal-time');
+  const linkEl  = document.getElementById('meal-recipe');
+  const notesEl = document.getElementById('meal-notes');
 
   const name = (nameEl?.value || '').trim();
   if (!name) {
