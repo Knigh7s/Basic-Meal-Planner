@@ -12,7 +12,7 @@ import uuid
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers.storage import Store
-from homeassistant.helpers.entity import Entity
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.entity_component import EntityComponent
 
 from .const import DOMAIN, STORAGE_FILE, STORAGE_DIR, EVENT_UPDATED
@@ -57,66 +57,32 @@ def _upsert_library(data: dict, name: str, recipe_url: str, notes: str):
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     return True
 
-class PotentialMealsSensor(Entity):
+class PotentialMealsSensor(SensorEntity):
     _attr_name = "Meal Planner Potential Meals"
     _attr_icon = "mdi:lightbulb-outline"
     _attr_should_poll = False
 
-    def __init__(self, hass: HomeAssistant, store: Store, data: dict):
+    def __init__(self, hass: HomeAssistant, store: Store, data: dict, entry_id: str):
         self.hass = hass
         self.store = store
         self.data = data
-        self._attr_unique_id = "meal_planner_potential"
+        self._attr_unique_id = f"{entry_id}_meal_planner_potential"
         self._recalc()
+    ...
 
-    def _recalc(self):
-        items = [m["name"] for m in self.data.get("scheduled", []) if not (m.get("date") or "").strip()]
-        self._attr_native_value = len(items)
-        self._attr_extra_state_attributes = {"items": sorted(items, key=lambda s: s.lower())}
-
-    async def async_update_from_data(self):
-        self._recalc()
-        self.async_write_ha_state()
-
-class WeeklyMealsSensor(Entity):
+class WeeklyMealsSensor(SensorEntity):
     _attr_name = "Meal Planner Weekly View"
     _attr_icon = "mdi:calendar-week"
     _attr_should_poll = False
 
-    def __init__(self, hass: HomeAssistant, store: Store, data: dict):
+    def __init__(self, hass: HomeAssistant, store: Store, data: dict, entry_id: str):
         self.hass = hass
         self.store = store
         self.data = data
-        self._attr_unique_id = "meal_planner_week"
+        self._attr_unique_id = f"{entry_id}_meal_planner_week"
         self._recalc()
+    ...
 
-    def _recalc(self):
-        today = datetime.now().date()
-        week_start = self.data.get("settings", {}).get("week_start", "Sunday")
-        start, end = _current_week_bounds(today, week_start)
-        days_order = ["sun","mon","tue","wed","thu","fri","sat"]
-        day_labels = {"sun":"Sun","mon":"Mon","tue":"Tue","wed":"Wed","thu":"Thu","fri":"Fri","sat":"Sat"}
-        grid = {k: {"label": day_labels[k], "breakfast":"", "lunch":"", "dinner":""} for k in days_order}
-        for m in self.data.get("scheduled", []):
-            ds = (m.get("date") or "").strip()
-            if not ds: 
-                continue
-            try:
-                d = datetime.strptime(ds, "%Y-%m-%d").date()
-            except Exception:
-                continue
-            if start <= d <= end:
-                mapping = {6:"sun",0:"mon",1:"tue",2:"wed",3:"thu",4:"fri",5:"sat"}
-                k = mapping[d.weekday()]
-                slot = (m.get("meal_time") or "Dinner").strip().lower()
-                if slot in ("breakfast","lunch","dinner"):
-                    grid[k][slot] = m.get("name","")
-        self._attr_native_value = f"{start.isoformat()} to {end.isoformat()}"
-        self._attr_extra_state_attributes = {"week_start": week_start, "start": start.isoformat(), "end": end.isoformat(), "days": grid}
-
-    async def async_update_from_data(self):
-        self._recalc()
-        self.async_write_ha_state()
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     store_dir = Path(hass.config.path(STORAGE_DIR))
@@ -139,8 +105,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN] = {"store": store, "data": data, "sensor": None}
 
     # Register sensors
-    pot_sensor = PotentialMealsSensor(hass, store, data)
-    week_sensor = WeeklyMealsSensor(hass, store, data)
+    pot_sensor = PotentialMealsSensor(hass, store, data, entry.entry_id)
+    week_sensor = WeeklyMealsSensor(hass, store, data, entry.entry_id)
     try:
         comp = EntityComponent(_LOGGER, "sensor", hass)
         await comp.async_add_entities([pot_sensor, week_sensor], True)
@@ -267,8 +233,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 component_name="iframe",
                 sidebar_title="Meal Planner",
                 sidebar_icon="mdi:silverware-fork-knife",
+                frontend_url_path="meal-planner",
                 config={"url": "/meal-planner"},
-                require_admin=False
+                require_admin=False,
             )
         except Exception as e:
             _LOGGER.debug("Sidebar register error: %s", e)
