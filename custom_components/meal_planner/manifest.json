@@ -8,5 +8,6 @@
   "requirements": [],
   "config_flow": true,
   "iot_class": "local_push",
-  "dependencies": ["frontend"]
+  "dependencies": ["frontend"],  
+  "integration_type": "hub",
 }
