@@ -65,12 +65,12 @@
             <div class="modal-card">
                 <h3>Add Meal</h3>
                 <label>Name
-                    <input id="meal_name" list="meal_options" type="text" placeholder="e.g., Chicken Alfredo">
+                    <input id="meal-name" list="meal_options" type="text" placeholder="e.g., Chicken Alfredo">
                     <datalist id="meal_options"></datalist>
                 </label>
-                <label>Date <input id="meal_date" type="date"></label>
+                <label>Date <input id="meal-date" type="date"></label>
                 <label>Meal Time
-                    <select id="meal_time">
+                    <select id="meal-time">
                         <option>Breakfast</option>
                         <option>Lunch</option>
                         <option selected>Dinner</option>
@@ -78,10 +78,10 @@
                     </select>
                 </label>
                 <label>Recipe link (optional)
-                    <input id="meal_recipe" type="url" placeholder="https://...">
+                    <input id="meal-recipe" type="url" placeholder="https://...">
                 </label>
                 <label>Notes (optional)
-                    <textarea id="meal_notes" rows="3" placeholder="Any details to remember"></textarea>
+                    <textarea id="meal-notes" rows="3" placeholder="Any details to remember"></textarea>
                 </label>
                 <div class="modal-actions">
                     <button id="save" onclick="saveMeal()">Save</button>
