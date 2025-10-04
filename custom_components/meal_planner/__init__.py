@@ -21,6 +21,10 @@ from .const import DOMAIN, STORAGE_FILE, STORAGE_DIR, EVENT_UPDATED
 
 _LOGGER = logging.getLogger(__name__)
 
+# ----------------------------
+# In-memory defaults / helpers
+# ----------------------------
+
 DEFAULT_DATA = {
     "settings": {"week_start": "Sunday"},
     "scheduled": [],  # list of entries with id, name, meal_time, date, recipe_url, notes
@@ -68,6 +72,10 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     return True
 
 
+# --------------
+# Sensor entities
+# --------------
+
 class PotentialMealsSensor(SensorEntity):
     _attr_name = "Meal Planner Potential Meals"
     _attr_icon = "mdi:lightbulb-outline"
@@ -77,6 +85,7 @@ class PotentialMealsSensor(SensorEntity):
         self.hass = hass
         self.store = store
         self.data = data
+        # unique per config entry to avoid collisions
         self._attr_unique_id = f"{entry_id}_meal_planner_potential"
         self._recalc()
 
@@ -152,6 +161,10 @@ class WeeklyMealsSensor(SensorEntity):
         self._recalc()
         self.async_write_ha_state()
 
+
+# -------------------
+# Config entry setup
+# -------------------
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Ensure storage dir
@@ -261,12 +274,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 new_list.append(m)
 
             elif action == "delete":
-                # drop this row (do not append)
+                # drop this row
                 pass
 
         data["scheduled"] = new_list
         await _save_and_notify()
-
 
     hass.services.async_register(DOMAIN, "bulk", svc_bulk)
 
@@ -295,74 +307,111 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.services.async_register(DOMAIN, "promote_future_to_week", svc_promote_future)
 
-    # ---------- WebSocket commands (must run before returning) ----------
-from homeassistant.components import websocket_api
+    # ---------- WebSocket commands (register BEFORE returning) ----------
+    from homeassistant.components import websocket_api
 
-@websocket_api.websocket_command({"type": f"{DOMAIN}/get"})
-def ws_get(hass, connection, msg):
-    connection.send_result(msg["id"], {
-        "settings": data.get("settings", {"week_start": "Sunday"}),
-        "rows": data.get("scheduled", []),
-        "library": data.get("library", []),
-    })
-
-@websocket_api.websocket_command({"type": f"{DOMAIN}/add", "name": str, "meal_time": str, "date": str, "recipe_url": str, "notes": str})
-def ws_add(hass, connection, msg):
-    hass.async_create_task(hass.services.async_call(DOMAIN, "add", {
-        "name": msg.get("name",""),
-        "meal_time": msg.get("meal_time","Dinner"),
-        "date": msg.get("date",""),
-        "recipe_url": msg.get("recipe_url",""),
-        "notes": msg.get("notes",""),
-    }))
-    connection.send_result(msg["id"], {"queued": True})
-
-@websocket_api.websocket_command({"type": f"{DOMAIN}/bulk", "action": str, "ids": list, "date": str, "meal_time": str})
-def ws_bulk(hass, connection, msg):
-    hass.async_create_task(hass.services.async_call(DOMAIN, "bulk", {
-        "action": msg.get("action",""),
-        "ids": msg.get("ids",[]),
-        "date": msg.get("date",""),
-        "meal_time": msg.get("meal_time",""),
-    }))
-    connection.send_result(msg["id"], {"queued": True})
-
-# ---------- Serve static admin panel ----------
-panel_dir = Path(__file__).parent / "panel"
-await hass.http.async_register_static_paths([
-    StaticPathConfig(
-        url_path="/meal-planner",
-        path=str(panel_dir),
-        cache_headers=False,  # avoid stale JS/CSS
-    )
-])
-_LOGGER.info("Meal Planner: static panel served at /meal-planner from %s", panel_dir)
-
-# ---------- Sidebar (iframe) ----------
-from homeassistant.components.frontend import async_register_built_in_panel, async_remove_panel
-
-panel_id = "meal-planner"
-add_sidebar = True  # TEMP: force ON to recover the link
-
-try:
-    await async_remove_panel(hass, panel_id)  # safe even if not present
-except Exception:
-    pass
-
-if add_sidebar:
-    try:
-        # NOTE: do NOT 'await' this — it's synchronous
-        async_register_built_in_panel(
-            hass,
-            component_name="iframe",
-            sidebar_title="Meal Planner",
-            sidebar_icon="mdi:silverware-fork-knife",
-            frontend_url_path=panel_id,                 # route: /meal-planner
-            config={"url": "/meal-planner/index.html"}, # file served above
-            require_admin=False,
+    @websocket_api.websocket_command({"type": f"{DOMAIN}/get"})
+    def ws_get(hass, connection, msg):
+        connection.send_result(
+            msg["id"],
+            {
+                "settings": data.get("settings", {"week_start": "Sunday"}),
+                "rows": data.get("scheduled", []),
+                "library": data.get("library", []),
+            },
         )
-        _LOGGER.info("Meal Planner: iframe panel '%s' registered", panel_id)
-    except Exception as e:
-        _LOGGER.error("Meal Planner: panel register failed: %s", e)
 
-return True
+    @websocket_api.websocket_command(
+        {
+            "type": f"{DOMAIN}/add",
+            "name": str,
+            "meal_time": str,
+            "date": str,
+            "recipe_url": str,
+            "notes": str,
+        }
+    )
+    def ws_add(hass, connection, msg):
+        hass.async_create_task(
+            hass.services.async_call(
+                DOMAIN,
+                "add",
+                {
+                    "name": msg.get("name", ""),
+                    "meal_time": msg.get("meal_time", "Dinner"),
+                    "date": msg.get("date", ""),
+                    "recipe_url": msg.get("recipe_url", ""),
+                    "notes": msg.get("notes", ""),
+                },
+            )
+        )
+        connection.send_result(msg["id"], {"queued": True})
+
+    @websocket_api.websocket_command(
+        {"type": f"{DOMAIN}/bulk", "action": str, "ids": list, "date": str, "meal_time": str}
+    )
+    def ws_bulk(hass, connection, msg):
+        hass.async_create_task(
+            hass.services.async_call(
+                DOMAIN,
+                "bulk",
+                {
+                    "action": msg.get("action", ""),
+                    "ids": msg.get("ids", []),
+                    "date": msg.get("date", ""),
+                    "meal_time": msg.get("meal_time", ""),
+                },
+            )
+        )
+        connection.send_result(msg["id"], {"queued": True})
+
+    # ---------- Serve static admin panel (no cache) ----------
+    panel_dir = Path(__file__).parent / "panel"
+    await hass.http.async_register_static_paths(
+        [
+            StaticPathConfig(
+                url_path="/meal-planner",
+                path=str(panel_dir),
+                cache_headers=False,  # avoid stale JS/CSS after HACS updates
+            )
+        ]
+    )
+    _LOGGER.info("Meal Planner: static panel served at /meal-planner from %s", panel_dir)
+
+    # ---------- Sidebar (iframe → reliable & simple) ----------
+    panel_id = "meal-planner"
+    add_sidebar = entry.options.get("add_sidebar", True)
+
+    try:
+        await async_remove_panel(hass, panel_id)  # safe if not present
+    except Exception:
+        pass
+
+    if add_sidebar:
+        try:
+            # NOTE: registrar is synchronous → do NOT 'await'
+            async_register_built_in_panel(
+                hass,
+                component_name="iframe",
+                sidebar_title="Meal Planner",
+                sidebar_icon="mdi:silverware-fork-knife",
+                frontend_url_path=panel_id,                  # /meal-planner
+                config={"url": "/meal-planner/index.html"},  # file served above
+                require_admin=False,
+            )
+            _LOGGER.info("Meal Planner: iframe panel '%s' registered", panel_id)
+        except Exception as e:
+            _LOGGER.error("Meal Planner: failed to register iframe panel: %s", e)
+    else:
+        _LOGGER.info("Meal Planner: sidebar option disabled; panel not registered")
+
+    return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    try:
+        await async_remove_panel(hass, "meal-planner")
+    except Exception:
+        pass
+    hass.data.pop(DOMAIN, None)
+    return True
