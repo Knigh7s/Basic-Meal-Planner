@@ -24,3 +24,15 @@ ul{list-style:disc;padding-left:20px}
 .modal-card label{display:flex;flex-direction:column;gap:4px;margin:8px 0}
 .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 a{color:#9ec1ff}
+.icon-edit {
+  margin-left: .5rem;
+  font-size: .9rem;
+  line-height: 1;
+  padding: .2rem .4rem;
+  border: 1px solid var(--divider-color,#3a3a3a);
+  border-radius: .35rem;
+  background: var(--ha-card-background,#1f1f1f);
+  cursor: pointer;
+}
+tr.is-potential td { opacity: .95; } /* keep your greying style */
+
