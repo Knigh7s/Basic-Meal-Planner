@@ -6,17 +6,19 @@
     <title>Meal Planner</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="./style.css">
-    <script>
+<script>
 (function () {
   try {
+    // If this file loads top-level (user refreshed inside iframe), bounce to the panel route
     if (!window.parent || window.parent === window) {
-      location.replace("/meal-planner");   // reload via HA shell
+      location.replace("/meal-planner");  // lets HA load the iframe again
     }
   } catch (_) {
     location.replace("/meal-planner");
   }
 })();
 </script>
+
 
 </head>
 
