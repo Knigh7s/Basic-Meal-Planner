@@ -295,7 +295,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.services.async_register(DOMAIN, "promote_future_to_week", svc_promote_future)
 
-        # ---------- WebSocket commands (register BEFORE returning) ----------
+    # ---------- WebSocket commands (register BEFORE returning) ----------
     from homeassistant.components import websocket_api
 
     @websocket_api.websocket_command({"type": f"{DOMAIN}/get"})
@@ -360,40 +360,38 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             StaticPathConfig(
                 url_path="/meal-planner",
                 path=str(panel_dir),
-                cache_headers=False,   # avoid aggressive caching during updates
+                cache_headers=False,  # avoid stale JS/CSS after HACS updates
             )
         ]
     )
     _LOGGER.info("Meal Planner: static panel served at /meal-planner from %s", panel_dir)
 
-    # (No redirect needed; iframe points directly to index.html)
-
-    # ---------- Sidebar (iframe panel pointing to the HTML file) ----------
+    # ---------- Sidebar (built-in HTML panel → first-class HA route) ----------
+    # This creates a real panel at /meal-planner that wraps your index.html.
     panel_id = "meal-planner"
     add_sidebar = entry.options.get("add_sidebar", True)
 
     try:
-        await async_remove_panel(hass, panel_id)
+        await async_remove_panel(hass, panel_id)  # safe if it doesn't exist
     except Exception:
         pass
 
     if add_sidebar:
         try:
-            # NOTE: do NOT 'await' this; it's sync
+            # NOTE: do NOT 'await' this; it is synchronous
             async_register_built_in_panel(
                 hass,
-                component_name="iframe",
+                component_name="html",
                 sidebar_title="Meal Planner",
                 sidebar_icon="mdi:silverware-fork-knife",
-                frontend_url_path=panel_id,
-                config={"url": "/meal-planner/index.html"},
+                frontend_url_path=panel_id,                # panel route: /meal-planner
+                config={"html_url": "/meal-planner/index.html"},  # served by static path
                 require_admin=False,
             )
-            _LOGGER.info("Meal Planner: iframe sidebar panel '%s' registered", panel_id)
+            _LOGGER.info("Meal Planner: HTML sidebar panel '%s' registered", panel_id)
         except Exception as e:
-            _LOGGER.error("Meal Planner: failed to register iframe sidebar panel: %s", e)
+            _LOGGER.error("Meal Planner: failed to register HTML sidebar panel: %s", e)
     else:
         _LOGGER.info("Meal Planner: sidebar option disabled; panel not registered")
 
-    # Always finish with True
     return True
