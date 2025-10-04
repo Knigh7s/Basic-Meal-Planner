@@ -295,103 +295,95 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.services.async_register(DOMAIN, "promote_future_to_week", svc_promote_future)
 
-    # ---------- WebSocket commands (register BEFORE returning) ----------
-    from homeassistant.components import websocket_api
+    # ---------- WebSocket commands (must run before return True) ----------
+from homeassistant.components import websocket_api
 
-    @websocket_api.websocket_command({"type": f"{DOMAIN}/get"})
-    def ws_get(hass, connection, msg):
-        connection.send_result(
-            msg["id"],
+@websocket_api.websocket_command({"type": f"{DOMAIN}/get"})
+def ws_get(hass, connection, msg):
+    connection.send_result(
+        msg["id"],
+        {
+            "settings": data.get("settings", {"week_start": "Sunday"}),
+            "rows": data.get("scheduled", []),
+            "library": data.get("library", []),
+        },
+    )
+
+@websocket_api.websocket_command(
+    {"type": f"{DOMAIN}/add", "name": str, "meal_time": str, "date": str, "recipe_url": str, "notes": str}
+)
+def ws_add(hass, connection, msg):
+    hass.async_create_task(
+        hass.services.async_call(
+            DOMAIN,
+            "add",
             {
-                "settings": data.get("settings", {"week_start": "Sunday"}),
-                "rows": data.get("scheduled", []),
-                "library": data.get("library", []),
+                "name": msg.get("name", ""),
+                "meal_time": msg.get("meal_time", "Dinner"),
+                "date": msg.get("date", ""),
+                "recipe_url": msg.get("recipe_url", ""),
+                "notes": msg.get("notes", ""),
             },
         )
-
-    @websocket_api.websocket_command(
-        {
-            "type": f"{DOMAIN}/add",
-            "name": str,
-            "meal_time": str,
-            "date": str,
-            "recipe_url": str,
-            "notes": str,
-        }
     )
-    def ws_add(hass, connection, msg):
-        hass.async_create_task(
-            hass.services.async_call(
-                DOMAIN,
-                "add",
-                {
-                    "name": msg.get("name", ""),
-                    "meal_time": msg.get("meal_time", "Dinner"),
-                    "date": msg.get("date", ""),
-                    "recipe_url": msg.get("recipe_url", ""),
-                    "notes": msg.get("notes", ""),
-                },
-            )
+    connection.send_result(msg["id"], {"queued": True})
+
+@websocket_api.websocket_command(
+    {"type": f"{DOMAIN}/bulk", "action": str, "ids": list, "date": str, "meal_time": str}
+)
+def ws_bulk(hass, connection, msg):
+    hass.async_create_task(
+        hass.services.async_call(
+            DOMAIN,
+            "bulk",
+            {
+                "action": msg.get("action", ""),
+                "ids": msg.get("ids", []),
+                "date": msg.get("date", ""),
+                "meal_time": msg.get("meal_time", ""),
+            },
         )
-        connection.send_result(msg["id"], {"queued": True})
-
-    @websocket_api.websocket_command(
-        {"type": f"{DOMAIN}/bulk", "action": str, "ids": list, "date": str, "meal_time": str}
     )
-    def ws_bulk(hass, connection, msg):
-        hass.async_create_task(
-            hass.services.async_call(
-                DOMAIN,
-                "bulk",
-                {
-                    "action": msg.get("action", ""),
-                    "ids": msg.get("ids", []),
-                    "date": msg.get("date", ""),
-                    "meal_time": msg.get("meal_time", ""),
-                },
-            )
+    connection.send_result(msg["id"], {"queued": True})
+
+# ---------- Serve static admin panel ----------
+panel_dir = Path(__file__).parent / "panel"
+await hass.http.async_register_static_paths(
+    [
+        StaticPathConfig(
+            url_path="/meal-planner",
+            path=str(panel_dir),
+            cache_headers=False,  # avoid stale JS/CSS
         )
-        connection.send_result(msg["id"], {"queued": True})
+    ]
+)
+_LOGGER.info("Meal Planner: static panel served at /meal-planner from %s", panel_dir)
 
-    # ---------- Serve static admin panel ----------
-    panel_dir = Path(__file__).parent / "panel"
-    await hass.http.async_register_static_paths(
-        [
-            StaticPathConfig(
-                url_path="/meal-planner",
-                path=str(panel_dir),
-                cache_headers=False,  # avoid stale JS/CSS after HACS updates
-            )
-        ]
-    )
-    _LOGGER.info("Meal Planner: static panel served at /meal-planner from %s", panel_dir)
+# ---------- Sidebar (iframe panel that loads the HTML) ----------
+panel_id = "meal-planner"
+add_sidebar = entry.options.get("add_sidebar", True)
 
-    # ---------- Sidebar (built-in HTML panel → first-class HA route) ----------
-    # This creates a real panel at /meal-planner that wraps your index.html.
-    panel_id = "meal-planner"
-    add_sidebar = entry.options.get("add_sidebar", True)
+try:
+    await async_remove_panel(hass, panel_id)  # safe even if not present
+except Exception:
+    pass
 
+if add_sidebar:
     try:
-        await async_remove_panel(hass, panel_id)  # safe if it doesn't exist
-    except Exception:
-        pass
+        # IMPORTANT: do NOT 'await' this
+        async_register_built_in_panel(
+            hass,
+            component_name="iframe",
+            sidebar_title="Meal Planner",
+            sidebar_icon="mdi:silverware-fork-knife",
+            frontend_url_path=panel_id,                 # route: /meal-planner
+            config={"url": "/meal-planner/index.html"}, # your HTML file
+            require_admin=False,
+        )
+        _LOGGER.info("Meal Planner: iframe panel '%s' registered", panel_id)
+    except Exception as e:
+        _LOGGER.error("Meal Planner: panel register failed: %s", e)
+else:
+    _LOGGER.info("Meal Planner: sidebar option disabled")
 
-    if add_sidebar:
-        try:
-            # NOTE: do NOT 'await' this; it is synchronous
-            async_register_built_in_panel(
-                hass,
-                component_name="html",
-                sidebar_title="Meal Planner",
-                sidebar_icon="mdi:silverware-fork-knife",
-                frontend_url_path=panel_id,                # panel route: /meal-planner
-                config={"html_url": "/meal-planner/index.html"},  # served by static path
-                require_admin=False,
-            )
-            _LOGGER.info("Meal Planner: HTML sidebar panel '%s' registered", panel_id)
-        except Exception as e:
-            _LOGGER.error("Meal Planner: failed to register HTML sidebar panel: %s", e)
-    else:
-        _LOGGER.info("Meal Planner: sidebar option disabled; panel not registered")
-
-    return True
+return True
