@@ -393,13 +393,12 @@ function wireUI() {
 // =====================
 async function subscribeToUpdates() {
   try {
-    const hc = await window.parent.hassConnection; // {conn, auth}
+    const hc = await window.parent.hassConnection;
     const conn = hc.conn ?? hc;
     conn.subscribeEvents(() => loadMeals(), "meal_planner_updated");
-  } catch {
-    // If not in HA shell, ignore silently
-  }
+  } catch (_) { /* not in HA shell */ }
 }
+
 
 // =====================
 // Boot
