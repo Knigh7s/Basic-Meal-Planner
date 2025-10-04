@@ -343,6 +343,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         }))
         connection.send_result(msg["id"], {"queued": True})
 
+    websocket_api.async_register_command(hass, ws_get)
+    websocket_api.async_register_command(hass, ws_add)
+    websocket_api.async_register_command(hass, ws_bulk)
 
     # ---------- Serve static admin panel (no cache) ----------
     panel_dir = Path(__file__).parent / "panel"
@@ -394,4 +397,5 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         pass
     hass.data.pop(DOMAIN, None)
     return True
+
 
