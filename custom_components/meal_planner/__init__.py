@@ -295,56 +295,78 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.services.async_register(DOMAIN, "promote_future_to_week", svc_promote_future)
 
-    # ---------- Websocket for admin panel ----------
+        # ---------- WebSocket commands (register BEFORE returning) ----------
     from homeassistant.components import websocket_api
 
     @websocket_api.websocket_command({"type": f"{DOMAIN}/get"})
     def ws_get(hass, connection, msg):
-        connection.send_result(msg["id"], {
-            "settings": data.get("settings", {"week_start": "Sunday"}),
-            "rows": data.get("scheduled", []),
-            "library": data.get("library", []),
-        })
-
-    @websocket_api.websocket_command({"type": f"{DOMAIN}/add", "name": str, "meal_time": str, "date": str, "recipe_url": str, "notes": str})
-    def ws_add(hass, connection, msg):
-        hass.async_create_task(hass.services.async_call(DOMAIN, "add", {
-            "name": msg.get("name", ""),
-            "meal_time": msg.get("meal_time", "Dinner"),
-            "date": msg.get("date", ""),
-            "recipe_url": msg.get("recipe_url", ""),
-            "notes": msg.get("notes", ""),
-        }))
-        connection.send_result(msg["id"], {"queued": True})
-
-    @websocket_api.websocket_command({"type": f"{DOMAIN}/bulk", "action": str, "ids": list, "date": str, "meal_time": str})
-    def ws_bulk(hass, connection, msg):
-        hass.async_create_task(hass.services.async_call(DOMAIN, "bulk", {
-            "action": msg.get("action", ""),
-            "ids": msg.get("ids", []),
-            "date": msg.get("date", ""),
-            "meal_time": msg.get("meal_time", ""),
-        }))
-        connection.send_result(msg["id"], {"queued": True})
-
-    # ---------- Serve static admin panel (keep this as you already have it) ----------
-    panel_dir = Path(__file__).parent / "panel"
-    await hass.http.async_register_static_paths([
-        StaticPathConfig(
-            url_path="/meal-planner",
-            path=str(panel_dir),
-            cache_headers=True,
+        connection.send_result(
+            msg["id"],
+            {
+                "settings": data.get("settings", {"week_start": "Sunday"}),
+                "rows": data.get("scheduled", []),
+                "library": data.get("library", []),
+            },
         )
-    ])
+
+    @websocket_api.websocket_command(
+        {
+            "type": f"{DOMAIN}/add",
+            "name": str,
+            "meal_time": str,
+            "date": str,
+            "recipe_url": str,
+            "notes": str,
+        }
+    )
+    def ws_add(hass, connection, msg):
+        hass.async_create_task(
+            hass.services.async_call(
+                DOMAIN,
+                "add",
+                {
+                    "name": msg.get("name", ""),
+                    "meal_time": msg.get("meal_time", "Dinner"),
+                    "date": msg.get("date", ""),
+                    "recipe_url": msg.get("recipe_url", ""),
+                    "notes": msg.get("notes", ""),
+                },
+            )
+        )
+        connection.send_result(msg["id"], {"queued": True})
+
+    @websocket_api.websocket_command(
+        {"type": f"{DOMAIN}/bulk", "action": str, "ids": list, "date": str, "meal_time": str}
+    )
+    def ws_bulk(hass, connection, msg):
+        hass.async_create_task(
+            hass.services.async_call(
+                DOMAIN,
+                "bulk",
+                {
+                    "action": msg.get("action", ""),
+                    "ids": msg.get("ids", []),
+                    "date": msg.get("date", ""),
+                    "meal_time": msg.get("meal_time", ""),
+                },
+            )
+        )
+        connection.send_result(msg["id"], {"queued": True})
+
+    # ---------- Serve static admin panel ----------
+    panel_dir = Path(__file__).parent / "panel"
+    await hass.http.async_register_static_paths(
+        [
+            StaticPathConfig(
+                url_path="/meal-planner",
+                path=str(panel_dir),
+                cache_headers=False,   # avoid aggressive caching during updates
+            )
+        ]
+    )
     _LOGGER.info("Meal Planner: static panel served at /meal-planner from %s", panel_dir)
 
-    # ---------- Optional: redirect /meal-planner → /meal-planner/index.html ----------
-    try:
-        # Safe: if it’s already present HA may warn; we ignore
-        hass.http.register_redirect("/meal-planner", "/meal-planner/index.html")
-        _LOGGER.info("Meal Planner: redirect set /meal-planner → /meal-planner/index.html")
-    except Exception as e:
-        _LOGGER.debug("Meal Planner: redirect already present or not needed: %s", e)
+    # (No redirect needed; iframe points directly to index.html)
 
     # ---------- Sidebar (iframe panel pointing to the HTML file) ----------
     panel_id = "meal-planner"
@@ -357,7 +379,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     if add_sidebar:
         try:
-            # NOTE: do NOT await this; it is synchronous
+            # NOTE: do NOT 'await' this; it's sync
             async_register_built_in_panel(
                 hass,
                 component_name="iframe",
@@ -373,5 +395,5 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     else:
         _LOGGER.info("Meal Planner: sidebar option disabled; panel not registered")
 
-    # Important: always finish with True
+    # Always finish with True
     return True
