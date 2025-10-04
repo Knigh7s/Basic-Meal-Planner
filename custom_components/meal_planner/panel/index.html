@@ -1,206 +1,217 @@
 <!doctype html>
 <html>
-
 <head>
-    <meta charset="utf-8">
-    <title>Meal Planner</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="./style.css">
-<script>
-(function () {
-  try {
-    // If this file loads top-level (user refreshed inside iframe), bounce to the panel route
-    if (!window.parent || window.parent === window) {
-      location.replace("/meal-planner");  // lets HA load the iframe again
+  <meta charset="utf-8">
+  <title>Meal Planner</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="./style.css">
+
+  <!-- Refresh guard: if loaded top-level, bounce back to HA panel route -->
+  <script>
+  (function () {
+    try {
+      if (!window.parent || window.parent === window) {
+        location.replace("/meal-planner");
+      }
+    } catch (_) {
+      location.replace("/meal-planner");
     }
-  } catch (_) {
-    location.replace("/meal-planner");
-  }
-})();
-</script>
+  })();
+  </script>
 
-
+  <style>
+    /* light, additive polish without touching your existing CSS */
+    .mp-header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+    .mp-actions{display:flex;align-items:center;gap:.5rem}
+    .icon-btn{padding:.45rem .6rem;border-radius:.5rem;border:1px solid var(--divider-color,#3a3a3a);background:var(--ha-card-background,#1f1f1f);cursor:pointer}
+    .primary{padding:.5rem .9rem;border-radius:.6rem;border:0;background:var(--primary-color,#03a9f4);color:#fff;font-weight:600;cursor:pointer}
+    .mp-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem 1rem;margin:.75rem 0 1rem}
+    .filter-group,.bulk-group{display:flex;align-items:center;gap:.5rem}
+    .hidden{display:none}
+    #allTable th,#allTable td{vertical-align:middle}
+    #allTable .narrow{width:32px;text-align:center}
+    .linkbtn{padding:.35rem .65rem;border-radius:.45rem;border:1px solid var(--divider-color,#3a3a3a);background:var(--ha-card-background,#1f1f1f);cursor:pointer}
+  </style>
 </head>
 
 <body>
-    <div id="app">
-        <header>
-            <h1>🍽️ Meal Planner</h1>
-            <div class="actions">
-                <button id="btn-add">+ Add Meal</button>
-                <div class="spacer"></div>
-                <label class="chk"><input id="hidePast" type="checkbox" checked> Hide past week</label>
-                <label>Filter:
-                    <select id="filterType">
-                        <option value="none">None</option>
-                        <option value="week">Week</option>
-                        <option value="month">Month</option>
-                    </select>
-                </label>
-                <input id="weekPicker" type="week" class="hidden">
-                <input id="monthPicker" type="month" class="hidden">
-                <button id="btn-showall">Show All</button>
-                <div class="spacer"></div>
-                <select id="bulkAction">
-                    <option value="">Bulk Actions…</option>
-                    <option value="convert_to_potential">Convert to Potential (clear date)</option>
-                    <option value="assign_date">Assign date…</option>
-                    <option value="delete">Delete</option>
-                </select>
-                <input id="bulkDate" type="date" class="hidden">
-                <select id="bulkTime" class="hidden">
-                    <option>Breakfast</option>
-                    <option>Lunch</option>
-                    <option selected>Dinner</option>
-                    <option>Snack</option>
-                </select>
-                <button id="btn-apply" disabled>Apply</button>
-            </div>
-        </header>
+  <div id="app">
 
-        <section>
-            <h2>All Meals</h2>
-            <table id="allTable">
-                <thead>
-                    <tr>
-                        <th class="narrow"><input type="checkbox" id="selectAll"></th>
-                        <th>Name</th>
-                        <th>Status</th>
-                        <th>Recipe</th>
-                        <th>Notes</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </section>
+    <!-- Header: title on left, Settings + Add Meal on right -->
+    <header class="mp-header">
+      <h1>🍽️ Meal Planner</h1>
+      <div class="mp-actions">
+        <button id="btn-settings" class="icon-btn" title="Settings">⚙️</button>
+        <button id="btn-add" class="primary">+ Add Meal</button>
+      </div>
+    </header>
 
-        <!-- Modal: Add Meal -->
-        <div id="modal" class="modal hidden">
-            <div class="modal-card">
-                <h3>Add Meal</h3>
-                <label>Name
-                    <input id="meal-name" list="meal_options" type="text" placeholder="e.g., Chicken Alfredo">
-                    <datalist id="meal_options"></datalist>
-                </label>
-                <label>Date <input id="meal-date" type="date"></label>
-                <label>Meal Time
-                    <select id="meal-time">
-                        <option>Breakfast</option>
-                        <option>Lunch</option>
-                        <option selected>Dinner</option>
-                        <option>Snack</option>
-                    </select>
-                </label>
-                <label>Recipe link (optional)
-                    <input id="meal-recipe" type="url" placeholder="https://...">
-                </label>
-                <label>Notes (optional)
-                    <textarea id="meal-notes" rows="3" placeholder="Any details to remember"></textarea>
-                </label>
-                <div class="modal-actions">
-                    <button id="save" onclick="saveMeal()">Save</button>
-                    <button id="cancel">Cancel</button>
-                </div>
-            </div>
-        </div>
+    <!-- Compact toolbar: same IDs, cleaner layout -->
+    <div class="mp-toolbar">
+      <label class="chk">
+        <input id="hidePast" type="checkbox" checked>
+        Hide past week
+      </label>
 
+      <div class="filter-group">
+        <label>Filter
+          <select id="filterType">
+            <option value="none">None</option>
+            <option value="week">Week</option>
+            <option value="month">Month</option>
+          </select>
+        </label>
+        <input id="weekPicker" type="week" class="hidden">
+        <input id="monthPicker" type="month" class="hidden">
+        <button id="btn-showall">Show All</button>
+      </div>
+
+      <div class="bulk-group">
+        <select id="bulkAction">
+          <option value="">Bulk Actions…</option>
+          <option value="convert_to_potential">Convert to Potential (clear date)</option>
+          <option value="assign_date">Assign date…</option>
+          <option value="delete">Delete</option>
+        </select>
+        <input id="bulkDate" type="date" class="hidden">
+        <select id="bulkTime" class="hidden">
+          <option>Breakfast</option>
+          <option>Lunch</option>
+          <option selected>Dinner</option>
+          <option>Snack</option>
+        </select>
+        <button id="btn-apply" disabled>Apply</button>
+      </div>
     </div>
-   <script>
-/* ---- Robust HA WebSocket helpers ---- */
-async function getHAConnection() {
-  // 1) Preferred: Home Assistant exposes a promise on window.parent
-  if (window.parent && window.parent.hassConnection) {
-    try {
-      return await window.parent.hassConnection;
-    } catch (_) {}
-  }
-  // 2) Fallback: grab it from the top-level <home-assistant> element
-  try {
-    const haEl = window.top?.document.querySelector('home-assistant');
-    if (haEl?.hass?.connection) return haEl.hass.connection;
-  } catch (_) {}
-  // 3) Wait a tick and retry (front-end might still be initializing)
-  await new Promise(r => setTimeout(r, 150));
-  return getHAConnection();
-}
 
-async function haWS(msg) {
-  const conn = await getHAConnection();
-  if (!conn || typeof conn.sendMessagePromise !== 'function') {
-    throw new Error('HA connection not ready (sendMessagePromise missing)');
-  }
-  return conn.sendMessagePromise(msg);
-}
+    <section>
+      <h2>All Meals</h2>
+      <table id="allTable">
+        <thead>
+          <tr>
+            <th class="narrow"><input type="checkbox" id="selectAll"></th>
+            <th>Name</th>
+            <th>Meal Time</th>
+            <th>Date</th>
+            <th>Recipe</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
 
-/* ---- Modal helpers (if you don’t already have them) ---- */
-function openAddModal() {
-  document.getElementById('modal')?.classList.remove('hidden');
-}
-function closeAddModal() {
-  document.getElementById('modal')?.classList.add('hidden');
-}
+    <!-- Modal: Add Meal (unchanged IDs) -->
+    <div id="modal" class="modal hidden">
+      <div class="modal-card">
+        <h3>Add Meal</h3>
+        <label>Name
+          <input id="meal-name" list="meal_options" type="text" placeholder="e.g., Chicken Alfredo">
+          <datalist id="meal_options"></datalist>
+        </label>
+        <label>Date <input id="meal-date" type="date"></label>
+        <label>Meal Time
+          <select id="meal-time">
+            <option>Breakfast</option>
+            <option>Lunch</option>
+            <option selected>Dinner</option>
+            <option>Snack</option>
+          </select>
+        </label>
+        <label>Recipe link (optional)
+          <input id="meal-recipe" type="url" placeholder="https://...">
+        </label>
+        <label>Notes (optional)
+          <textarea id="meal-notes" rows="3" placeholder="Any details to remember"></textarea>
+        </label>
+        <div class="modal-actions">
+          <button id="save" onclick="saveMeal()">Save</button>
+          <button id="cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
 
-/* ---- Save handler using your underscore IDs ---- */
-async function saveMeal() {
-  const nameEl  = document.getElementById('meal-name');
-  const dateEl  = document.getElementById('meal-date');
-  const timeEl  = document.getElementById('meal-time');
-  const linkEl  = document.getElementById('meal-recipe');
-  const notesEl = document.getElementById('meal-notes');
+  </div>
 
-  const name = (nameEl?.value || '').trim();
-  if (!name) {
-    alert('Please enter a meal name.');
-    nameEl?.focus();
-    return;
-  }
-
-  const payload = {
-    type: 'meal_planner/add',
-    name,
-    meal_time: (timeEl?.value || 'Dinner'),
-    date: (dateEl?.value || ''),       // blank = Potential
-    recipe_url: (linkEl?.value || ''),
-    notes: (notesEl?.value || '')
-  };
-
-  const btn = document.getElementById('save');
-  if (btn) btn.disabled = true;
-
-  try {
-    const resp = await haWS(payload);
-    // Optional: sanity log
-    // console.debug('add resp', resp);
-
-    closeAddModal();
-
-    // Refresh your table if you have a loader
-    if (typeof loadMealsTable === 'function') {
-      await loadMealsTable();
-    } else {
-      window.location.reload();
+  <!-- WS helpers + Save handler (kept as-is) -->
+  <script>
+  /* ---- Robust HA WebSocket helpers ---- */
+  async function getHAConnection() {
+    if (window.parent && window.parent.hassConnection) {
+      try { return await window.parent.hassConnection; } catch (_) {}
     }
-  } catch (err) {
-    // Show the *real* reason in console
-    console.error('Save failed', err);
-    // And something readable for the user
-    const msg = (err && (err.message || err.code || err.error)) || String(err);
-    alert('Unable to save meal: ' + msg);
-  } finally {
-    if (btn) btn.disabled = false;
+    try {
+      const haEl = window.top?.document.querySelector('home-assistant');
+      if (haEl?.hass?.connection) return haEl.hass.connection;
+    } catch (_) {}
+    await new Promise(r => setTimeout(r, 150));
+    return getHAConnection();
   }
-}
 
-/* Wire buttons on load */
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('btn-add')?.addEventListener('click', openAddModal);
-  document.getElementById('cancel')?.addEventListener('click', closeAddModal);
-  const saveBtn = document.getElementById('save');
-  if (saveBtn && !saveBtn.onclick) saveBtn.addEventListener('click', saveMeal);
-});
-</script>
+  async function haWS(msg) {
+    const conn = await getHAConnection();
+    if (!conn || typeof conn.sendMessagePromise !== 'function') {
+      throw new Error('HA connection not ready (sendMessagePromise missing)');
+    }
+    return conn.sendMessagePromise(msg);
+  }
 
-    <script src="./app.js"></script>
+  function openAddModal(){ document.getElementById('modal')?.classList.remove('hidden'); }
+  function closeAddModal(){ document.getElementById('modal')?.classList.add('hidden'); }
+
+  /* ---- Save Meal (unchanged IDs) ---- */
+  async function saveMeal() {
+    const nameEl  = document.getElementById('meal-name');
+    const dateEl  = document.getElementById('meal-date');
+    const timeEl  = document.getElementById('meal-time');
+    const linkEl  = document.getElementById('meal-recipe');
+    const notesEl = document.getElementById('meal-notes');
+
+    const name = (nameEl?.value || '').trim();
+    if (!name) { alert('Please enter a meal name.'); nameEl?.focus(); return; }
+
+    const payload = {
+      type: 'meal_planner/add',
+      name,
+      meal_time: (timeEl?.value || 'Dinner'),
+      date: (dateEl?.value || ''),
+      recipe_url: (linkEl?.value || ''),
+      notes: (notesEl?.value || '')
+    };
+
+    const btn = document.getElementById('save'); if (btn) btn.disabled = true;
+
+    try {
+      await haWS(payload);
+      closeAddModal();
+      if (typeof loadMealsTable === 'function') { await loadMealsTable(); }
+      else { window.location.reload(); }
+    } catch (err) {
+      console.error('Save failed', err);
+      const msg = (err && (err.message || err.code || err.error)) || String(err);
+      alert('Unable to save meal: ' + msg);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  /* Wire buttons + recipe button delegate */
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('btn-add')?.addEventListener('click', openAddModal);
+    document.getElementById('btn-settings')?.addEventListener('click', () => alert('Settings coming soon'));
+    document.getElementById('cancel')?.addEventListener('click', closeAddModal);
+
+    // If rows render a .linkbtn with data-href, this opens it safely
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.linkbtn');
+      if (btn) {
+        const href = btn.getAttribute('data-href');
+        if (href) window.open(href, '_blank', 'noopener,noreferrer');
+      }
+    });
+  });
+  </script>
+
+  <script src="./app.js"></script>
 </body>
-
 </html>
