@@ -246,6 +246,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.services.async_register(DOMAIN, "add", svc_add)
 
+    async def svc_update(call: ServiceCall):
+        row_id = (call.data.get("row_id") or "").strip()
+        if not row_id:
+            return
+
+        valid_times = ("Breakfast", "Lunch", "Dinner", "Snack")
+        updated = False
+        for m in data["scheduled"]:
+            if m.get("id") == row_id:
+                # Update only provided fields
+                if "name" in call.data:
+                    m["name"] = (call.data.get("name") or "").strip()
+                    updated = True
+                if "meal_time" in call.data:
+                    mt = (call.data.get("meal_time") or "").strip().title()
+                    if mt in valid_times:
+                        m["meal_time"] = mt
+                        updated = True
+                if "date" in call.data:
+                    m["date"] = (call.data.get("date") or "").strip()
+                    updated = True
+                if "recipe_url" in call.data:
+                    m["recipe_url"] = (call.data.get("recipe_url") or "").strip()
+                    updated = True
+                if "notes" in call.data:
+                    m["notes"] = (call.data.get("notes") or "").strip()
+                    updated = True
+                break
+
+        if updated:
+            await _save_and_notify()
+
+    hass.services.async_register(DOMAIN, "update", svc_update)
+    
     async def svc_bulk(call: ServiceCall):
         action = (call.data.get("action") or "").lower()
         ids = list(call.data.get("ids") or [])
@@ -332,6 +366,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         }))
         connection.send_result(msg["id"], {"queued": True})
 
+    @websocket_api.websocket_command({
+        "type": f"{DOMAIN}/update",
+        "row_id": str,
+        # the rest are optional; only update what is provided
+        "name": str,
+        "meal_time": str,
+        "date": str,
+        "recipe_url": str,
+        "notes": str,
+    })
+    @callback
+    def ws_update(hass, connection, msg):
+        payload = {
+            "row_id": msg.get("row_id", ""),
+        }
+        for k in ("name", "meal_time", "date", "recipe_url", "notes"):
+            if k in msg:
+                payload[k] = msg.get(k, "")
+
+        hass.async_create_task(
+            hass.services.async_call(DOMAIN, "update", payload)
+        )
+        connection.send_result(msg["id"], {"queued": True})
+
     @websocket_api.websocket_command({"type": f"{DOMAIN}/bulk", "action": str, "ids": list, "date": str, "meal_time": str})
     @callback
     def ws_bulk(hass, connection, msg):
@@ -397,5 +455,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         pass
     hass.data.pop(DOMAIN, None)
     return True
+
 
 
