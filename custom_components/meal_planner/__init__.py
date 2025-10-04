@@ -16,6 +16,7 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers.storage import Store
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.entity_component import EntityComponent
+from homeassistant.core import callback
 
 from .const import DOMAIN, STORAGE_FILE, STORAGE_DIR, EVENT_UPDATED
 
@@ -311,59 +312,37 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from homeassistant.components import websocket_api
 
     @websocket_api.websocket_command({"type": f"{DOMAIN}/get"})
+    @callback
     def ws_get(hass, connection, msg):
-        connection.send_result(
-            msg["id"],
-            {
-                "settings": data.get("settings", {"week_start": "Sunday"}),
-                "rows": data.get("scheduled", []),
-                "library": data.get("library", []),
-            },
-        )
+        connection.send_result(msg["id"], {
+            "settings": data.get("settings", {"week_start": "Sunday"}),
+            "rows": data.get("scheduled", []),
+            "library": data.get("library", []),
+        })
 
-    @websocket_api.websocket_command(
-        {
-            "type": f"{DOMAIN}/add",
-            "name": str,
-            "meal_time": str,
-            "date": str,
-            "recipe_url": str,
-            "notes": str,
-        }
-    )
+    @websocket_api.websocket_command({"type": f"{DOMAIN}/add", "name": str, "meal_time": str, "date": str, "recipe_url": str, "notes": str})
+    @callback
     def ws_add(hass, connection, msg):
-        hass.async_create_task(
-            hass.services.async_call(
-                DOMAIN,
-                "add",
-                {
-                    "name": msg.get("name", ""),
-                    "meal_time": msg.get("meal_time", "Dinner"),
-                    "date": msg.get("date", ""),
-                    "recipe_url": msg.get("recipe_url", ""),
-                    "notes": msg.get("notes", ""),
-                },
-            )
-        )
+        hass.async_create_task(hass.services.async_call(DOMAIN, "add", {
+            "name": msg.get("name",""),
+            "meal_time": msg.get("meal_time","Dinner"),
+            "date": msg.get("date",""),
+            "recipe_url": msg.get("recipe_url",""),
+            "notes": msg.get("notes",""),
+        }))
         connection.send_result(msg["id"], {"queued": True})
 
-    @websocket_api.websocket_command(
-        {"type": f"{DOMAIN}/bulk", "action": str, "ids": list, "date": str, "meal_time": str}
-    )
+    @websocket_api.websocket_command({"type": f"{DOMAIN}/bulk", "action": str, "ids": list, "date": str, "meal_time": str})
+    @callback
     def ws_bulk(hass, connection, msg):
-        hass.async_create_task(
-            hass.services.async_call(
-                DOMAIN,
-                "bulk",
-                {
-                    "action": msg.get("action", ""),
-                    "ids": msg.get("ids", []),
-                    "date": msg.get("date", ""),
-                    "meal_time": msg.get("meal_time", ""),
-                },
-            )
-        )
+        hass.async_create_task(hass.services.async_call(DOMAIN, "bulk", {
+            "action": msg.get("action",""),
+            "ids": msg.get("ids",[]),
+            "date": msg.get("date",""),
+            "meal_time": msg.get("meal_time",""),
+        }))
         connection.send_result(msg["id"], {"queued": True})
+
 
     # ---------- Serve static admin panel (no cache) ----------
     panel_dir = Path(__file__).parent / "panel"
@@ -415,3 +394,4 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         pass
     hass.data.pop(DOMAIN, None)
     return True
+
