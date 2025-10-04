@@ -107,10 +107,8 @@ function renderTable() {
   // figure anchor for filters
   let weekAnchor = new Date();
   if (weekPicker && !weekPicker.classList.contains("hidden") && weekPicker.value) {
-    // input type=week format: "YYYY-W##"
     const [y, w] = weekPicker.value.split("-W");
     if (y && w) {
-      // ISO week approximation: set to Thursday of that week, then compute startOfWeek
       const jan4 = new Date(Number(y), 0, 4);
       const dayOfWeek = jan4.getDay() || 7;
       const thurs = new Date(jan4);
@@ -121,43 +119,35 @@ function renderTable() {
 
   let monthAnchor = new Date();
   if (monthPicker && !monthPicker.classList.contains("hidden") && monthPicker.value) {
-    // input type=month format: "YYYY-MM"
     const [y, m] = monthPicker.value.split("-");
     if (y && m) monthAnchor = new Date(Number(y), Number(m) - 1, 1);
   }
 
-  // Build rows
   const frag = document.createDocumentFragment();
-
-  // Reset "select all"
   const selectAll = $("#selectAll");
   if (selectAll) selectAll.checked = false;
-
-  // Clear tbody
   tbody.innerHTML = "";
 
   for (const row of allData.rows || []) {
     const dt = parseISODate(row.date);
     const isPotential = !row.date;
 
-    // Hide past week if requested (applies only to scheduled)
-    if (hidePast && !isPotential && isInPastWeek(dt, weekStart)) {
-      continue;
-    }
+    // Hide past week (only scheduled items)
+    if (hidePast && !isPotential && isInPastWeek(dt, weekStart)) continue;
 
     // Filters
     if (filterType === "week") {
       if (!isPotential && !isInSameWeek(dt, weekAnchor, weekStart)) continue;
-      if (isPotential) continue; // potentials hidden in week filter
+      if (isPotential) continue;
     } else if (filterType === "month") {
       if (!isPotential && !isInSameMonth(dt, monthAnchor)) continue;
-      if (isPotential) continue; // potentials hidden in month filter
+      if (isPotential) continue;
     }
 
     const tr = document.createElement("tr");
-    if (isPotential) tr.classList.add("is-potential"); // style: grey background
+    if (isPotential) tr.classList.add("is-potential"); // grey background via your CSS
 
-    // checkbox
+    // [0] checkbox
     const tdCheck = document.createElement("td");
     tdCheck.className = "narrow";
     const cb = document.createElement("input");
@@ -167,35 +157,35 @@ function renderTable() {
     tdCheck.appendChild(cb);
     tr.appendChild(tdCheck);
 
-    // name
+    // [1] Name
     const tdName = document.createElement("td");
     tdName.textContent = row.name || "";
     tr.appendChild(tdName);
 
-    // status
-    const tdStatus = document.createElement("td");
-    if (isPotential) {
-      tdStatus.textContent = "Potential";
-    } else {
-      tdStatus.textContent = `${row.meal_time || "Dinner"} — ${row.date}`;
-    }
-    tr.appendChild(tdStatus);
+    // [2] Meal Time
+    const tdMeal = document.createElement("td");
+    tdMeal.textContent = isPotential ? "—" : (row.meal_time || "Dinner");
+    tr.appendChild(tdMeal);
 
-    // recipe
+    // [3] Date
+    const tdDate = document.createElement("td");
+    tdDate.textContent = isPotential ? "—" : (row.date || "—");
+    tr.appendChild(tdDate);
+
+    // [4] Recipe → button if link exists
     const tdRecipe = document.createElement("td");
-    if (row.recipe_url) {
-      const a = document.createElement("a");
-      a.href = row.recipe_url;
-      a.target = "_blank";
-      a.rel = "noopener";
-      a.textContent = "Open";
-      tdRecipe.appendChild(a);
+    if (row.recipe_url && String(row.recipe_url).trim()) {
+      const btn = document.createElement("button");
+      btn.className = "linkbtn";
+      btn.dataset.href = row.recipe_url;
+      btn.textContent = "Open";
+      tdRecipe.appendChild(btn);
     } else {
       tdRecipe.textContent = "—";
     }
     tr.appendChild(tdRecipe);
 
-    // notes
+    // [5] Notes
     const tdNotes = document.createElement("td");
     tdNotes.textContent = row.notes || "—";
     tr.appendChild(tdNotes);
@@ -387,6 +377,15 @@ function wireUI() {
     document.querySelectorAll(".row-select").forEach((cb) => (cb.checked = on));
   });
 }
+
+// Open recipe links from buttons
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".linkbtn");
+  if (!btn) return;
+  const href = btn.getAttribute("data-href");
+  if (href) window.open(href, "_blank", "noopener,noreferrer");
+});
+
 
 // =====================
 // Event subscription (live refresh)
