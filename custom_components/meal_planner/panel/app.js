@@ -33,6 +33,8 @@ let allData = {
   library: [],
 };
 
+let currentEditId = null; // track the row being edited (null = adding)
+
 const $ = (sel) => document.querySelector(sel);
 
 // =====================
@@ -159,7 +161,13 @@ function renderTable() {
 
     // [1] Name
     const tdName = document.createElement("td");
-    tdName.textContent = row.name || "";
+    tdName.append(document.createTextNode(row.name || ""));
+    const editBtn = document.createElement("button");
+    editBtn.className = "icon-edit";
+    editBtn.title = "Edit";
+    editBtn.dataset.id = row.id;
+    editBtn.textContent = "✎";
+    tdName.append(" ", editBtn);
     tr.appendChild(tdName);
 
     // [2] Meal Time
@@ -194,6 +202,10 @@ function renderTable() {
   }
 
   tbody.appendChild(frag);
+
+  document.querySelectorAll(".row-select")
+  .forEach(cb => cb.addEventListener("change", updateBulkUI));
+  updateBulkUI();
 }
 
 // =====================
@@ -228,7 +240,7 @@ function closeAddModal() {
 // Actions
 // =====================
 async function saveMeal() {
-  // Hyphenated IDs (as you standardized in your HTML)
+  // Hyphenated IDs (as in your HTML)
   const nameEl  = document.getElementById("meal-name");
   const dateEl  = document.getElementById("meal-date");
   const timeEl  = document.getElementById("meal-time");
@@ -236,28 +248,46 @@ async function saveMeal() {
   const notesEl = document.getElementById("meal-notes");
 
   const name = (nameEl?.value || "").trim();
-  if (!name) {
-    alert("Please enter a meal name.");
-    nameEl?.focus();
-    return;
-  }
+  if (!name) { alert("Please enter a meal name."); nameEl?.focus(); return; }
 
-  const payload = {
-    type: "meal_planner/add",
-    name,
-    meal_time: (timeEl?.value || "Dinner"),
-    date: (dateEl?.value || ""),           // blank → Potential
-    recipe_url: (linkEl?.value || ""),
-    notes: (notesEl?.value || ""),
-  };
+  const date  = (dateEl?.value || "");
+  const meal  = (timeEl?.value || "Dinner");
+  const recipe= (linkEl?.value || "");
+  const notes = (notesEl?.value || "");
 
   const btn = document.getElementById("save");
   if (btn) btn.disabled = true;
 
   try {
-    await haWS(payload);
+    if (currentEditId) {
+      // Try true update (name/meal/date/recipe/notes). If backend lacks it, fallback to bulk date/time.
+      try {
+        await haWS({
+          type: "meal_planner/update",
+          row_id: currentEditId,
+          name, meal_time: meal, date, recipe_url: recipe, notes
+        });
+      } catch (e) {
+        const msg = (e && (e.code || e.message) || "") + "";
+        if (/unknown/i.test(msg)) {
+          await haWS({ type: "meal_planner/bulk", action: "assign_date", ids: [currentEditId], date, meal_time: meal });
+          // NOTE: fallback won’t change name/recipe/notes (add backend update later to support that)
+        } else {
+          throw e;
+        }
+      }
+      currentEditId = null;
+    } else {
+      // Add new
+      await haWS({
+        type: "meal_planner/add",
+        name, meal_time: meal, date, recipe_url: recipe, notes
+      });
+    }
+
     closeAddModal();
-    // optionally clear fields for next time
+
+    // reset fields for next time
     if (nameEl) nameEl.value = "";
     if (dateEl) dateEl.value = "";
     if (timeEl) timeEl.value = "Dinner";
@@ -316,6 +346,25 @@ async function applyBulk() {
   }
 }
 
+function updateBulkUI() {
+  const action = document.getElementById("bulkAction")?.value || "";
+  const anySelected = !!document.querySelector(".row-select:checked");
+  const needsDate = (action === "assign_date");
+  const hasDate = !!document.getElementById("bulkDate")?.value;
+
+  // Ensure date/time pickers visibility matches the action
+  if (needsDate) {
+    document.getElementById("bulkDate")?.classList.remove("hidden");
+    document.getElementById("bulkTime")?.classList.remove("hidden");
+  } else {
+    document.getElementById("bulkDate")?.classList.add("hidden");
+    document.getElementById("bulkTime")?.classList.add("hidden");
+  }
+
+  const apply = document.getElementById("btn-apply");
+  if (apply) apply.disabled = !action || !anySelected || (needsDate && !hasDate);
+}
+
 // =====================
 // UI wiring
 // =====================
@@ -340,7 +389,7 @@ function updateFilterVisibility() {
 function wireUI() {
   // Add / Cancel / Save
   $("#btn-add")?.addEventListener("click", openAddModal);
-  $("#cancel")?.addEventListener("click", closeAddModal);
+  document.getElementById("cancel")?.addEventListener("click", () => { currentEditId = null; closeAddModal(); });
   const saveBtn = $("#save");
   if (saveBtn && !saveBtn.onclick) saveBtn.addEventListener("click", saveMeal);
 
@@ -369,6 +418,10 @@ function wireUI() {
       $("#bulkTime")?.classList.add("hidden");
     }
   });
+  // Bulk UI helpers
+  $("#bulkAction")?.addEventListener("change", updateBulkUI);
+  $("#bulkDate")?.addEventListener("input", updateBulkUI);
+  $("#selectAll")?.addEventListener("change", updateBulkUI);
   $("#btn-apply")?.addEventListener("click", applyBulk);
 
   // Select all
@@ -377,6 +430,24 @@ function wireUI() {
     document.querySelectorAll(".row-select").forEach((cb) => (cb.checked = on));
   });
 }
+
+// Click pencil to edit a single row
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".icon-edit");
+  if (!btn) return;
+  const id = btn.getAttribute("data-id");
+  const row = (allData?.rows || []).find(r => r.id === id);
+  if (!row) return;
+
+  currentEditId = id;
+  $("#meal-name").value   = row.name || "";
+  $("#meal-date").value   = row.date || "";
+  $("#meal-time").value   = row.meal_time || "Dinner";
+  $("#meal-recipe").value = row.recipe_url || "";
+  $("#meal-notes").value  = row.notes || "";
+
+  openAddModal();
+});
 
 // Open recipe links from buttons
 document.addEventListener("click", (e) => {
