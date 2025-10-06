@@ -35,8 +35,6 @@ let allData = {
 
 let currentEditId = null; // track the row being edited (null = adding)
 
-const $ = (sel) => document.querySelector(sel);
-
 // =====================
 // Date utilities
 // =====================
@@ -230,11 +228,14 @@ function populateDatalist() {
 // Modal handlers
 // =====================
 function openAddModal() {
-  $("#modal")?.classList.remove("hidden");
+  const m = document.getElementById("modal");
+  if (m) m.classList.remove("hidden");
 }
 function closeAddModal() {
-  $("#modal")?.classList.add("hidden");
+  const m = document.getElementById("modal");
+  if (m) m.classList.add("hidden");
 }
+
 
 // =====================
 // Actions
@@ -369,9 +370,9 @@ function updateBulkUI() {
 // UI wiring
 // =====================
 function updateFilterVisibility() {
-  const filterType = $("#filterType")?.value || "none";
-  const weekPicker = $("#weekPicker");
-  const monthPicker = $("#monthPicker");
+  const filterType = (document.getElementById("filterType")?.value || "none");
+  const weekPicker  = document.getElementById("weekPicker");
+  const monthPicker = document.getElementById("monthPicker");
   if (weekPicker && monthPicker) {
     if (filterType === "week") {
       weekPicker.classList.remove("hidden");
