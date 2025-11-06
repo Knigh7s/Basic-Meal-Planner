@@ -119,7 +119,7 @@ function renderTable() {
   const monthPicker = $("#monthPicker");
   const weekStart = (allData.settings?.week_start || "Sunday");
 
-  console.log("renderTable() - Filters:", {hidePast, filterType, weekStart});
+  console.log("renderTable() - Filters:", { hidePast, filterType, weekStart });
   console.log("renderTable() - Total meals to render:", allData.rows?.length || 0);
 
   // figure anchor for filters
@@ -288,13 +288,13 @@ async function saveMeal() {
   console.log("saveMeal() called");
 
   // Hyphenated IDs (as in your HTML)
-  const nameEl  = document.getElementById("meal-name");
-  const dateEl  = document.getElementById("meal-date");
-  const timeEl  = document.getElementById("meal-time");
-  const linkEl  = document.getElementById("meal-recipe");
+  const nameEl = document.getElementById("meal-name");
+  const dateEl = document.getElementById("meal-date");
+  const timeEl = document.getElementById("meal-time");
+  const linkEl = document.getElementById("meal-recipe");
   const notesEl = document.getElementById("meal-notes");
 
-  console.log("Form elements found:", {nameEl, dateEl, timeEl, linkEl, notesEl});
+  console.log("Form elements found:", { nameEl, dateEl, timeEl, linkEl, notesEl });
 
   const name = (nameEl?.value || "").trim();
   if (!name) {
@@ -303,12 +303,12 @@ async function saveMeal() {
     return;
   }
 
-  const date  = (dateEl?.value || "");
-  const meal  = (timeEl?.value || "Dinner");
-  const recipe= (linkEl?.value || "");
+  const date = (dateEl?.value || "");
+  const meal = (timeEl?.value || "Dinner");
+  const recipe = (linkEl?.value || "");
   const notes = (notesEl?.value || "");
 
-  console.log("Saving meal:", {name, date, meal, recipe, notes});
+  console.log("Saving meal:", { name, date, meal, recipe, notes });
 
   const btn = document.getElementById("save");
   if (btn) btn.disabled = true;
@@ -483,7 +483,7 @@ function updateBulkUI() {
 // =====================
 function updateFilterVisibility() {
   const filterType = (document.getElementById("filterType")?.value || "none");
-  const weekPicker  = document.getElementById("weekPicker");
+  const weekPicker = document.getElementById("weekPicker");
   const monthPicker = document.getElementById("monthPicker");
   if (weekPicker && monthPicker) {
     if (filterType === "week") {
@@ -565,11 +565,11 @@ document.addEventListener("click", (e) => {
   if (!row) return;
 
   currentEditId = id;
-  $("#meal-name").value   = row.name || "";
-  $("#meal-date").value   = row.date || "";
-  $("#meal-time").value   = row.meal_time || "Dinner";
+  $("#meal-name").value = row.name || "";
+  $("#meal-date").value = row.date || "";
+  $("#meal-time").value = row.meal_time || "Dinner";
   $("#meal-recipe").value = row.recipe_url || "";
-  $("#meal-notes").value  = row.notes || "";
+  $("#meal-notes").value = row.notes || "";
 
   openAddModal();
 });
