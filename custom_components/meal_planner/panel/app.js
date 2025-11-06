@@ -1,4 +1,17 @@
 // =====================
+// Helper functions
+// =====================
+function $(selector) {
+  // Simple helper: if selector has no spaces/special chars, use getElementById for speed
+  // Otherwise fall back to querySelector
+  const cleaned = selector.replace(/^#/, '');
+  if (!/[\s>+~\[\].,:]/.test(selector)) {
+    return document.getElementById(cleaned);
+  }
+  return document.querySelector(selector);
+}
+
+// =====================
 // Home Assistant WS helpers
 // =====================
 async function getHAConnection() {
@@ -46,7 +59,7 @@ function parseISODate(s) {
 
 function startOfWeek(d, weekStart = "Sunday") {
   const day = d.getDay(); // 0 Sun - 6 Sat
-  const isMonday = (weekStart || "Sunday").toLowerCase() === " monday".trim();
+  const isMonday = (weekStart || "Sunday").toLowerCase() === "monday";
   // Compute offset so we land on correct week start
   const offset = isMonday ? (day === 0 ? -6 : 1 - day) : -day;
   const res = new Date(d);
@@ -87,22 +100,33 @@ function isInSameMonth(dt, anchor = new Date()) {
 // Fetch & Render
 // =====================
 async function loadMeals() {
+  console.log("loadMeals() - Fetching data from backend...");
   const resp = await haWS({ type: "meal_planner/get" });
+  console.log("loadMeals() - Response received:", resp);
+  console.log("loadMeals() - Number of meals:", resp?.rows?.length || 0);
   // resp = { settings, rows, library }
   allData = resp || allData;
+  console.log("loadMeals() - allData updated:", allData);
   renderTable();
   populateDatalist();
 }
 
 function renderTable() {
-  const tbody = $("#allTable tbody");
-  if (!tbody) return;
+  console.log("renderTable() - Starting render...");
+  const tbody = document.querySelector("#allTable tbody");
+  if (!tbody) {
+    console.error("renderTable() - tbody not found!");
+    return;
+  }
 
   const hidePast = $("#hidePast")?.checked;
   const filterType = $("#filterType")?.value || "none";
   const weekPicker = $("#weekPicker");
   const monthPicker = $("#monthPicker");
   const weekStart = (allData.settings?.week_start || "Sunday");
+
+  console.log("renderTable() - Filters:", {hidePast, filterType, weekStart});
+  console.log("renderTable() - Total meals to render:", allData.rows?.length || 0);
 
   // figure anchor for filters
   let weekAnchor = new Date();
@@ -128,21 +152,49 @@ function renderTable() {
   if (selectAll) selectAll.checked = false;
   tbody.innerHTML = "";
 
+  let renderedCount = 0;
+  let filteredCount = 0;
+
   for (const row of allData.rows || []) {
     const dt = parseISODate(row.date);
     const isPotential = !row.date;
 
+    console.log(`renderTable() - Processing meal: "${row.name}", date: ${row.date}, isPotential: ${isPotential}`);
+
     // Hide past week (only scheduled items)
-    if (hidePast && !isPotential && isInPastWeek(dt, weekStart)) continue;
+    if (hidePast && !isPotential && isInPastWeek(dt, weekStart)) {
+      console.log(`  -> Filtered out (past week)`);
+      filteredCount++;
+      continue;
+    }
 
     // Filters
     if (filterType === "week") {
-      if (!isPotential && !isInSameWeek(dt, weekAnchor, weekStart)) continue;
-      if (isPotential) continue;
+      if (!isPotential && !isInSameWeek(dt, weekAnchor, weekStart)) {
+        console.log(`  -> Filtered out (not in selected week)`);
+        filteredCount++;
+        continue;
+      }
+      if (isPotential) {
+        console.log(`  -> Filtered out (potential meal when week filter active)`);
+        filteredCount++;
+        continue;
+      }
     } else if (filterType === "month") {
-      if (!isPotential && !isInSameMonth(dt, monthAnchor)) continue;
-      if (isPotential) continue;
+      if (!isPotential && !isInSameMonth(dt, monthAnchor)) {
+        console.log(`  -> Filtered out (not in selected month)`);
+        filteredCount++;
+        continue;
+      }
+      if (isPotential) {
+        console.log(`  -> Filtered out (potential meal when month filter active)`);
+        filteredCount++;
+        continue;
+      }
     }
+
+    console.log(`  -> Rendering meal to table`);
+    renderedCount++;
 
     const tr = document.createElement("tr");
     if (isPotential) tr.classList.add("is-potential"); // grey background via your CSS
@@ -200,9 +252,7 @@ function renderTable() {
   }
 
   tbody.appendChild(frag);
-
-  document.querySelectorAll(".row-select")
-  .forEach(cb => cb.addEventListener("change", updateBulkUI));
+  console.log(`renderTable() - Complete! Rendered: ${renderedCount}, Filtered: ${filteredCount}, Total: ${(allData.rows || []).length}`);
   updateBulkUI();
 }
 
@@ -241,6 +291,8 @@ function closeAddModal() {
 // Actions
 // =====================
 async function saveMeal() {
+  console.log("saveMeal() called");
+
   // Hyphenated IDs (as in your HTML)
   const nameEl  = document.getElementById("meal-name");
   const dateEl  = document.getElementById("meal-date");
@@ -248,19 +300,28 @@ async function saveMeal() {
   const linkEl  = document.getElementById("meal-recipe");
   const notesEl = document.getElementById("meal-notes");
 
+  console.log("Form elements found:", {nameEl, dateEl, timeEl, linkEl, notesEl});
+
   const name = (nameEl?.value || "").trim();
-  if (!name) { alert("Please enter a meal name."); nameEl?.focus(); return; }
+  if (!name) {
+    alert("Please enter a meal name.");
+    nameEl?.focus();
+    return;
+  }
 
   const date  = (dateEl?.value || "");
   const meal  = (timeEl?.value || "Dinner");
   const recipe= (linkEl?.value || "");
   const notes = (notesEl?.value || "");
 
+  console.log("Saving meal:", {name, date, meal, recipe, notes});
+
   const btn = document.getElementById("save");
   if (btn) btn.disabled = true;
 
   try {
     if (currentEditId) {
+      console.log("Updating existing meal:", currentEditId);
       // Try true update (name/meal/date/recipe/notes). If backend lacks it, fallback to bulk date/time.
       try {
         await haWS({
@@ -272,7 +333,7 @@ async function saveMeal() {
         const msg = (e && (e.code || e.message) || "") + "";
         if (/unknown/i.test(msg)) {
           await haWS({ type: "meal_planner/bulk", action: "assign_date", ids: [currentEditId], date, meal_time: meal });
-          // NOTE: fallback won’t change name/recipe/notes (add backend update later to support that)
+          // NOTE: fallback won't change name/recipe/notes (add backend update later to support that)
         } else {
           throw e;
         }
@@ -280,10 +341,12 @@ async function saveMeal() {
       currentEditId = null;
     } else {
       // Add new
-      await haWS({
+      console.log("Adding new meal via WebSocket");
+      const response = await haWS({
         type: "meal_planner/add",
         name, meal_time: meal, date, recipe_url: recipe, notes
       });
+      console.log("WebSocket response:", response);
     }
 
     closeAddModal();
@@ -295,7 +358,9 @@ async function saveMeal() {
     if (linkEl) linkEl.value = "";
     if (notesEl) notesEl.value = "";
 
+    console.log("Loading meals after save...");
     await loadMeals();
+    console.log("Meals reloaded successfully");
   } catch (err) {
     console.error("Save failed", err);
     alert("Unable to save meal: " + ((err && (err.message || err.code || err.error)) || String(err)));
@@ -315,6 +380,12 @@ async function applyBulk() {
   const ids = getSelectedIds();
   if (!action || ids.length === 0) {
     alert("Select an action and at least one row.");
+    return;
+  }
+
+  // Show confirmation for delete action
+  if (action === "delete") {
+    await showDeleteConfirmation(ids);
     return;
   }
 
@@ -345,6 +416,53 @@ async function applyBulk() {
     if ($("#bulkDate")) { $("#bulkDate").value = ""; $("#bulkDate").classList.add("hidden"); }
     if ($("#bulkTime")) { $("#bulkTime").classList.add("hidden"); }
   }
+}
+
+async function showDeleteConfirmation(ids) {
+  const count = ids.length;
+  const message = count === 1
+    ? "Are you sure you want to delete this meal?"
+    : `Are you sure you want to delete ${count} meals?`;
+
+  const confirmMsg = document.getElementById("confirm-message");
+  if (confirmMsg) confirmMsg.textContent = message;
+
+  const modal = document.getElementById("modal-confirm");
+  if (modal) modal.classList.remove("hidden");
+
+  // Wait for user response
+  return new Promise((resolve) => {
+    const yesBtn = document.getElementById("confirm-yes");
+    const noBtn = document.getElementById("confirm-no");
+
+    const cleanup = () => {
+      if (modal) modal.classList.add("hidden");
+      yesBtn?.removeEventListener("click", handleYes);
+      noBtn?.removeEventListener("click", handleNo);
+    };
+
+    const handleYes = async () => {
+      cleanup();
+      try {
+        await haWS({ type: "meal_planner/bulk", action: "delete", ids });
+        await loadMeals();
+        // Reset bulk UI
+        if ($("#bulkAction")) $("#bulkAction").value = "";
+      } catch (err) {
+        console.error("Delete failed", err);
+        alert("Delete failed: " + ((err && (err.message || err.code || err.error)) || String(err)));
+      }
+      resolve();
+    };
+
+    const handleNo = () => {
+      cleanup();
+      resolve();
+    };
+
+    yesBtn?.addEventListener("click", handleYes);
+    noBtn?.addEventListener("click", handleNo);
+  });
 }
 
 function updateBulkUI() {
@@ -388,8 +506,9 @@ function updateFilterVisibility() {
 }
 
 function wireUI() {
-  // Add / Cancel / Save
+  // Add / Cancel / Save / Settings
   $("#btn-add")?.addEventListener("click", openAddModal);
+  $("#btn-settings")?.addEventListener("click", () => alert("Settings coming soon"));
   document.getElementById("cancel")?.addEventListener("click", () => { currentEditId = null; closeAddModal(); });
   const saveBtn = $("#save");
   if (saveBtn && !saveBtn.onclick) saveBtn.addEventListener("click", saveMeal);
@@ -429,7 +548,18 @@ function wireUI() {
   $("#selectAll")?.addEventListener("change", (e) => {
     const on = e.target.checked;
     document.querySelectorAll(".row-select").forEach((cb) => (cb.checked = on));
+    updateBulkUI();
   });
+
+  // Event delegation for row checkboxes (prevents memory leak)
+  const tbody = document.querySelector("#allTable tbody");
+  if (tbody) {
+    tbody.addEventListener("change", (e) => {
+      if (e.target.classList.contains("row-select")) {
+        updateBulkUI();
+      }
+    });
+  }
 }
 
 // Click pencil to edit a single row
