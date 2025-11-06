@@ -1,4 +1,11 @@
 // =====================
+// Helper functions
+// =====================
+function $(selector) {
+  return document.getElementById(selector.replace(/^#/, ''));
+}
+
+// =====================
 // Home Assistant WS helpers
 // =====================
 async function getHAConnection() {
@@ -46,7 +53,7 @@ function parseISODate(s) {
 
 function startOfWeek(d, weekStart = "Sunday") {
   const day = d.getDay(); // 0 Sun - 6 Sat
-  const isMonday = (weekStart || "Sunday").toLowerCase() === " monday".trim();
+  const isMonday = (weekStart || "Sunday").toLowerCase() === "monday";
   // Compute offset so we land on correct week start
   const offset = isMonday ? (day === 0 ? -6 : 1 - day) : -day;
   const res = new Date(d);
@@ -200,9 +207,6 @@ function renderTable() {
   }
 
   tbody.appendChild(frag);
-
-  document.querySelectorAll(".row-select")
-  .forEach(cb => cb.addEventListener("change", updateBulkUI));
   updateBulkUI();
 }
 
@@ -241,6 +245,8 @@ function closeAddModal() {
 // Actions
 // =====================
 async function saveMeal() {
+  console.log("saveMeal() called");
+
   // Hyphenated IDs (as in your HTML)
   const nameEl  = document.getElementById("meal-name");
   const dateEl  = document.getElementById("meal-date");
@@ -248,19 +254,28 @@ async function saveMeal() {
   const linkEl  = document.getElementById("meal-recipe");
   const notesEl = document.getElementById("meal-notes");
 
+  console.log("Form elements found:", {nameEl, dateEl, timeEl, linkEl, notesEl});
+
   const name = (nameEl?.value || "").trim();
-  if (!name) { alert("Please enter a meal name."); nameEl?.focus(); return; }
+  if (!name) {
+    alert("Please enter a meal name.");
+    nameEl?.focus();
+    return;
+  }
 
   const date  = (dateEl?.value || "");
   const meal  = (timeEl?.value || "Dinner");
   const recipe= (linkEl?.value || "");
   const notes = (notesEl?.value || "");
 
+  console.log("Saving meal:", {name, date, meal, recipe, notes});
+
   const btn = document.getElementById("save");
   if (btn) btn.disabled = true;
 
   try {
     if (currentEditId) {
+      console.log("Updating existing meal:", currentEditId);
       // Try true update (name/meal/date/recipe/notes). If backend lacks it, fallback to bulk date/time.
       try {
         await haWS({
@@ -272,7 +287,7 @@ async function saveMeal() {
         const msg = (e && (e.code || e.message) || "") + "";
         if (/unknown/i.test(msg)) {
           await haWS({ type: "meal_planner/bulk", action: "assign_date", ids: [currentEditId], date, meal_time: meal });
-          // NOTE: fallback won’t change name/recipe/notes (add backend update later to support that)
+          // NOTE: fallback won't change name/recipe/notes (add backend update later to support that)
         } else {
           throw e;
         }
@@ -280,10 +295,12 @@ async function saveMeal() {
       currentEditId = null;
     } else {
       // Add new
-      await haWS({
+      console.log("Adding new meal via WebSocket");
+      const response = await haWS({
         type: "meal_planner/add",
         name, meal_time: meal, date, recipe_url: recipe, notes
       });
+      console.log("WebSocket response:", response);
     }
 
     closeAddModal();
@@ -295,7 +312,9 @@ async function saveMeal() {
     if (linkEl) linkEl.value = "";
     if (notesEl) notesEl.value = "";
 
+    console.log("Loading meals after save...");
     await loadMeals();
+    console.log("Meals reloaded successfully");
   } catch (err) {
     console.error("Save failed", err);
     alert("Unable to save meal: " + ((err && (err.message || err.code || err.error)) || String(err)));
@@ -315,6 +334,12 @@ async function applyBulk() {
   const ids = getSelectedIds();
   if (!action || ids.length === 0) {
     alert("Select an action and at least one row.");
+    return;
+  }
+
+  // Show confirmation for delete action
+  if (action === "delete") {
+    await showDeleteConfirmation(ids);
     return;
   }
 
@@ -345,6 +370,53 @@ async function applyBulk() {
     if ($("#bulkDate")) { $("#bulkDate").value = ""; $("#bulkDate").classList.add("hidden"); }
     if ($("#bulkTime")) { $("#bulkTime").classList.add("hidden"); }
   }
+}
+
+async function showDeleteConfirmation(ids) {
+  const count = ids.length;
+  const message = count === 1
+    ? "Are you sure you want to delete this meal?"
+    : `Are you sure you want to delete ${count} meals?`;
+
+  const confirmMsg = document.getElementById("confirm-message");
+  if (confirmMsg) confirmMsg.textContent = message;
+
+  const modal = document.getElementById("modal-confirm");
+  if (modal) modal.classList.remove("hidden");
+
+  // Wait for user response
+  return new Promise((resolve) => {
+    const yesBtn = document.getElementById("confirm-yes");
+    const noBtn = document.getElementById("confirm-no");
+
+    const cleanup = () => {
+      if (modal) modal.classList.add("hidden");
+      yesBtn?.removeEventListener("click", handleYes);
+      noBtn?.removeEventListener("click", handleNo);
+    };
+
+    const handleYes = async () => {
+      cleanup();
+      try {
+        await haWS({ type: "meal_planner/bulk", action: "delete", ids });
+        await loadMeals();
+        // Reset bulk UI
+        if ($("#bulkAction")) $("#bulkAction").value = "";
+      } catch (err) {
+        console.error("Delete failed", err);
+        alert("Delete failed: " + ((err && (err.message || err.code || err.error)) || String(err)));
+      }
+      resolve();
+    };
+
+    const handleNo = () => {
+      cleanup();
+      resolve();
+    };
+
+    yesBtn?.addEventListener("click", handleYes);
+    noBtn?.addEventListener("click", handleNo);
+  });
 }
 
 function updateBulkUI() {
@@ -388,8 +460,9 @@ function updateFilterVisibility() {
 }
 
 function wireUI() {
-  // Add / Cancel / Save
+  // Add / Cancel / Save / Settings
   $("#btn-add")?.addEventListener("click", openAddModal);
+  $("#btn-settings")?.addEventListener("click", () => alert("Settings coming soon"));
   document.getElementById("cancel")?.addEventListener("click", () => { currentEditId = null; closeAddModal(); });
   const saveBtn = $("#save");
   if (saveBtn && !saveBtn.onclick) saveBtn.addEventListener("click", saveMeal);
@@ -429,7 +502,18 @@ function wireUI() {
   $("#selectAll")?.addEventListener("change", (e) => {
     const on = e.target.checked;
     document.querySelectorAll(".row-select").forEach((cb) => (cb.checked = on));
+    updateBulkUI();
   });
+
+  // Event delegation for row checkboxes (prevents memory leak)
+  const tbody = document.querySelector("#allTable tbody");
+  if (tbody) {
+    tbody.addEventListener("change", (e) => {
+      if (e.target.classList.contains("row-select")) {
+        updateBulkUI();
+      }
+    });
+  }
 }
 
 // Click pencil to edit a single row
