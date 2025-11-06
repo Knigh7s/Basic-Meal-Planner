@@ -107,7 +107,7 @@ async function loadMeals() {
 
 function renderTable() {
   console.log("renderTable() - Starting render...");
-  const tbody = $("#allTable tbody");
+  const tbody = document.querySelector("#allTable tbody");
   if (!tbody) {
     console.error("renderTable() - tbody not found!");
     return;
@@ -603,4 +603,13 @@ window.addEventListener("DOMContentLoaded", async () => {
   updateFilterVisibility();
   await loadMeals();
   subscribeToUpdates();
+
+  // Handle refresh properly in iframe context
+  window.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "r") {
+      e.preventDefault();
+      console.log("Refresh requested - reloading data...");
+      loadMeals();
+    }
+  });
 });
