@@ -125,93 +125,27 @@
           <textarea id="meal-notes" rows="3" placeholder="Any details to remember"></textarea>
         </label>
         <div class="modal-actions">
-          <button id="save" onclick="saveMeal()">Save</button>
+          <button id="save">Save</button>
           <button id="cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Delete Confirmation -->
+    <div id="modal-confirm" class="modal hidden">
+      <div class="modal-card">
+        <h3>Confirm Delete</h3>
+        <p id="confirm-message">Are you sure you want to delete the selected meal(s)?</p>
+        <div class="modal-actions">
+          <button id="confirm-yes" class="danger">Delete</button>
+          <button id="confirm-no">Cancel</button>
         </div>
       </div>
     </div>
 
   </div>
 
-  <!-- WS helpers + Save handler (kept as-is) -->
-  <script>
-  /* ---- Robust HA WebSocket helpers ---- */
-  async function getHAConnection() {
-    if (window.parent && window.parent.hassConnection) {
-      try { return await window.parent.hassConnection; } catch (_) {}
-    }
-    try {
-      const haEl = window.top?.document.querySelector('home-assistant');
-      if (haEl?.hass?.connection) return haEl.hass.connection;
-    } catch (_) {}
-    await new Promise(r => setTimeout(r, 150));
-    return getHAConnection();
-  }
-
-  async function haWS(msg) {
-    const conn = await getHAConnection();
-    if (!conn || typeof conn.sendMessagePromise !== 'function') {
-      throw new Error('HA connection not ready (sendMessagePromise missing)');
-    }
-    return conn.sendMessagePromise(msg);
-  }
-
-  function openAddModal(){ document.getElementById('modal')?.classList.remove('hidden'); }
-  function closeAddModal(){ document.getElementById('modal')?.classList.add('hidden'); }
-
-  /* ---- Save Meal (unchanged IDs) ---- */
-  async function saveMeal() {
-    const nameEl  = document.getElementById('meal-name');
-    const dateEl  = document.getElementById('meal-date');
-    const timeEl  = document.getElementById('meal-time');
-    const linkEl  = document.getElementById('meal-recipe');
-    const notesEl = document.getElementById('meal-notes');
-
-    const name = (nameEl?.value || '').trim();
-    if (!name) { alert('Please enter a meal name.'); nameEl?.focus(); return; }
-
-    const payload = {
-      type: 'meal_planner/add',
-      name,
-      meal_time: (timeEl?.value || 'Dinner'),
-      date: (dateEl?.value || ''),
-      recipe_url: (linkEl?.value || ''),
-      notes: (notesEl?.value || '')
-    };
-
-    const btn = document.getElementById('save'); if (btn) btn.disabled = true;
-
-    try {
-      await haWS(payload);
-      closeAddModal();
-      if (typeof loadMealsTable === 'function') { await loadMealsTable(); }
-      else { window.location.reload(); }
-    } catch (err) {
-      console.error('Save failed', err);
-      const msg = (err && (err.message || err.code || err.error)) || String(err);
-      alert('Unable to save meal: ' + msg);
-    } finally {
-      if (btn) btn.disabled = false;
-    }
-  }
-
-  /* Wire buttons + recipe button delegate */
-  document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('btn-add')?.addEventListener('click', openAddModal);
-    document.getElementById('btn-settings')?.addEventListener('click', () => alert('Settings coming soon'));
-    document.getElementById('cancel')?.addEventListener('click', closeAddModal);
-
-    // If rows render a .linkbtn with data-href, this opens it safely
-    document.addEventListener('click', (e) => {
-      const btn = e.target.closest('.linkbtn');
-      if (btn) {
-        const href = btn.getAttribute('data-href');
-        if (href) window.open(href, '_blank', 'noopener,noreferrer');
-      }
-    });
-  });
-  </script>
-
+  <!-- Main application logic -->
   <script src="./app.js"></script>
 </body>
 </html>

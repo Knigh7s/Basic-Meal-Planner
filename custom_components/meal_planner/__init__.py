@@ -18,7 +18,17 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.core import callback
 
-from .const import DOMAIN, STORAGE_FILE, STORAGE_DIR, EVENT_UPDATED
+from .const import (
+    DOMAIN,
+    STORAGE_FILE,
+    STORAGE_DIR,
+    EVENT_UPDATED,
+    MAX_NAME_LENGTH,
+    MAX_NOTES_LENGTH,
+    MAX_URL_LENGTH,
+    MAX_LIBRARY_SIZE,
+    MAX_SCHEDULED_SIZE,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,6 +69,12 @@ def _upsert_library(data: dict, name: str, recipe_url: str, notes: str):
     if not key:
         return
     lib = data.setdefault("library", [])
+
+    # Enforce library size limit
+    if len(lib) >= MAX_LIBRARY_SIZE:
+        # Remove oldest entry if at limit
+        lib.pop(0)
+
     for item in lib:
         if (item.get("name", "").strip().lower()) == key:
             if recipe_url:
@@ -67,6 +83,62 @@ def _upsert_library(data: dict, name: str, recipe_url: str, notes: str):
                 item["notes"] = notes
             return
     lib.append({"name": name.strip(), "recipe_url": recipe_url, "notes": notes})
+
+
+def _validate_date(date_str: str) -> Optional[str]:
+    """Validate ISO date format (YYYY-MM-DD). Returns validated string or None."""
+    if not date_str or not date_str.strip():
+        return None
+    try:
+        parsed = datetime.strptime(date_str.strip(), "%Y-%m-%d").date()
+        return parsed.isoformat()
+    except (ValueError, TypeError):
+        _LOGGER.warning("Invalid date format: %s (expected YYYY-MM-DD)", date_str)
+        return None
+
+
+def _validate_url(url: str) -> str:
+    """Validate and sanitize URL. Returns sanitized URL or empty string."""
+    url = (url or "").strip()
+    if not url:
+        return ""
+    if len(url) > MAX_URL_LENGTH:
+        _LOGGER.warning("URL too long (%d chars), truncating to %d", len(url), MAX_URL_LENGTH)
+        url = url[:MAX_URL_LENGTH]
+    if not url.startswith(("http://", "https://")):
+        _LOGGER.warning("Invalid URL protocol (must be http/https): %s", url[:50])
+        return ""
+    # Remove null bytes
+    url = url.replace("\x00", "")
+    return url
+
+
+def _sanitize_string(value: str, max_length: int, field_name: str = "field") -> str:
+    """Sanitize and truncate string input."""
+    value = (value or "").strip()
+    # Remove null bytes
+    value = value.replace("\x00", "")
+    if len(value) > max_length:
+        _LOGGER.warning("%s too long (%d chars), truncating to %d", field_name, len(value), max_length)
+        value = value[:max_length]
+    return value
+
+
+def _enforce_scheduled_limits(data: dict):
+    """Enforce max scheduled meals limit. Remove oldest entries if needed."""
+    scheduled = data.get("scheduled", [])
+    if len(scheduled) <= MAX_SCHEDULED_SIZE:
+        return
+
+    # Sort by date (oldest first), potential meals (no date) go to end
+    def sort_key(m):
+        dt = _parse_date(m.get("date", ""))
+        return dt if dt else date.max
+
+    scheduled.sort(key=sort_key)
+    # Keep only the most recent MAX_SCHEDULED_SIZE entries
+    data["scheduled"] = scheduled[-MAX_SCHEDULED_SIZE:]
+    _LOGGER.info("Scheduled meals limit reached, removed %d oldest entries", len(scheduled) - MAX_SCHEDULED_SIZE)
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -224,15 +296,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # ---------- Services ----------
     async def svc_add(call: ServiceCall):
-        name = (call.data.get("name") or "").strip()
+        # Validate and sanitize inputs
+        name = _sanitize_string(call.data.get("name", ""), MAX_NAME_LENGTH, "meal name")
+        if not name:
+            _LOGGER.warning("Meal name is required")
+            return
+
         meal_time = (call.data.get("meal_time") or "Dinner").strip().title()
         if meal_time not in ("Breakfast", "Lunch", "Dinner", "Snack"):
             meal_time = "Dinner"
-        date_str = (call.data.get("date") or "").strip()
-        recipe_url = (call.data.get("recipe_url") or "").strip()
-        notes = (call.data.get("notes") or "").strip()
-        if not name:
-            return
+
+        # Validate date format
+        date_str = call.data.get("date", "")
+        if date_str:
+            validated_date = _validate_date(date_str)
+            date_str = validated_date if validated_date else ""
+
+        recipe_url = _validate_url(call.data.get("recipe_url", ""))
+        notes = _sanitize_string(call.data.get("notes", ""), MAX_NOTES_LENGTH, "notes")
+
         _upsert_library(data, name, recipe_url, notes)
         data["scheduled"].append({
             "id": uuid.uuid4().hex,
@@ -242,6 +324,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "recipe_url": recipe_url,
             "notes": notes,
         })
+
+        # Enforce limits
+        _enforce_scheduled_limits(data)
         await _save_and_notify()
 
     hass.services.async_register(DOMAIN, "add", svc_add)
@@ -255,23 +340,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         updated = False
         for m in data["scheduled"]:
             if m.get("id") == row_id:
-                # Update only provided fields
+                # Update only provided fields with validation
                 if "name" in call.data:
-                    m["name"] = (call.data.get("name") or "").strip()
-                    updated = True
+                    name = _sanitize_string(call.data.get("name", ""), MAX_NAME_LENGTH, "meal name")
+                    if name:
+                        m["name"] = name
+                        updated = True
                 if "meal_time" in call.data:
                     mt = (call.data.get("meal_time") or "").strip().title()
                     if mt in valid_times:
                         m["meal_time"] = mt
                         updated = True
                 if "date" in call.data:
-                    m["date"] = (call.data.get("date") or "").strip()
+                    date_str = call.data.get("date", "")
+                    if date_str:
+                        validated_date = _validate_date(date_str)
+                        m["date"] = validated_date if validated_date else ""
+                    else:
+                        m["date"] = ""
                     updated = True
                 if "recipe_url" in call.data:
-                    m["recipe_url"] = (call.data.get("recipe_url") or "").strip()
+                    m["recipe_url"] = _validate_url(call.data.get("recipe_url", ""))
                     updated = True
                 if "notes" in call.data:
-                    m["notes"] = (call.data.get("notes") or "").strip()
+                    m["notes"] = _sanitize_string(call.data.get("notes", ""), MAX_NOTES_LENGTH, "notes")
                     updated = True
                 break
 
@@ -283,11 +375,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async def svc_bulk(call: ServiceCall):
         action = (call.data.get("action") or "").lower()
         ids = list(call.data.get("ids") or [])
-        date_str = (call.data.get("date") or "").strip()
+        date_str = call.data.get("date", "")
         meal_time_in = (call.data.get("meal_time") or "").strip().title() or None
 
         if action not in ("convert_to_potential", "assign_date", "delete"):
             return
+
+        # Validate date if provided for assign_date action
+        if action == "assign_date" and date_str:
+            validated_date = _validate_date(date_str)
+            if not validated_date:
+                _LOGGER.warning("Invalid date for bulk assign: %s", date_str)
+                return
+            date_str = validated_date
 
         idset = set(ids)
         new_list = []
@@ -403,6 +503,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     websocket_api.async_register_command(hass, ws_get)
     websocket_api.async_register_command(hass, ws_add)
+    websocket_api.async_register_command(hass, ws_update)
     websocket_api.async_register_command(hass, ws_bulk)
 
     # ---------- Serve static admin panel (no cache) ----------
