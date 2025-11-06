@@ -16,6 +16,10 @@ class MealPlannerConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(title="Basic Meal Planner", data={})
         return self.async_show_form(step_id="user", data_schema=vol.Schema({}))
 
+    @staticmethod
+    def async_get_options_flow(config_entry: ConfigEntry) -> MealPlannerOptionsFlow:
+        return MealPlannerOptionsFlow(config_entry)
+
 class MealPlannerOptionsFlow(OptionsFlow):
     def __init__(self, entry: ConfigEntry) -> None:
         self.entry = entry
@@ -31,6 +35,3 @@ class MealPlannerOptionsFlow(OptionsFlow):
             ): bool
         })
         return self.async_show_form(step_id="init", data_schema=schema)
-
-async def async_get_options_flow(config_entry: ConfigEntry) -> MealPlannerOptionsFlow:
-    return MealPlannerOptionsFlow(config_entry)

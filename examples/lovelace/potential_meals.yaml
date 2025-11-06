@@ -1,1 +1,323 @@
-type: markdown
+# Potential Meals Card
+# This card displays your list of unscheduled "potential" meals
+# that can be added to your weekly schedule.
+#
+# Installation:
+# 1. Copy this entire configuration
+# 2. Go to your Lovelace dashboard in edit mode
+# 3. Click "Add Card" -> "Manual" (or edit raw configuration)
+# 4. Paste the configuration below
+# 5. Adjust the entity ID if your sensor has a different name
+
+type: custom:vertical-stack-in-card
+cards:
+  # Header Card
+  - type: markdown
+    content: |
+      # 💡 Potential Meals
+      **{{ states('sensor.meal_planner_potential') }} unscheduled meal{{ 's' if states('sensor.meal_planner_potential') | int != 1 else '' }}**
+    card_mod:
+      style: |
+        ha-card {
+          background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
+          color: var(--text-primary-color);
+          font-weight: 500;
+          padding: 8px 16px;
+          box-shadow: none;
+        }
+        ha-markdown {
+          padding: 0 !important;
+        }
+        h1 {
+          font-size: 1.5em;
+          margin: 0 0 4px 0;
+        }
+
+  # Potential Meals List
+  - type: markdown
+    content: |
+      {% set items = state_attr('sensor.meal_planner_potential', 'items') %}
+
+      <style>
+        .potential-meals-container {
+          padding: 0;
+        }
+        .meal-list {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+        }
+        .meal-item {
+          display: flex;
+          align-items: center;
+          padding: 12px 16px;
+          border-bottom: 1px solid var(--divider-color);
+          background: var(--card-background-color);
+          transition: background 0.2s ease;
+        }
+        .meal-item:hover {
+          background: var(--secondary-background-color);
+        }
+        .meal-item:last-child {
+          border-bottom: none;
+        }
+        .meal-icon {
+          font-size: 1.5em;
+          margin-right: 12px;
+          min-width: 32px;
+          text-align: center;
+        }
+        .meal-name {
+          flex: 1;
+          font-size: 1em;
+          color: var(--primary-text-color);
+          font-weight: 500;
+        }
+        .meal-number {
+          font-size: 0.85em;
+          color: var(--secondary-text-color);
+          background: var(--secondary-background-color);
+          padding: 4px 10px;
+          border-radius: 12px;
+          font-weight: 600;
+        }
+        .empty-state {
+          text-align: center;
+          padding: 40px 20px;
+          color: var(--secondary-text-color);
+        }
+        .empty-icon {
+          font-size: 3em;
+          margin-bottom: 12px;
+          opacity: 0.5;
+        }
+        .empty-text {
+          font-size: 1em;
+          font-style: italic;
+        }
+        .category-header {
+          background: var(--secondary-background-color);
+          padding: 8px 16px;
+          font-weight: 600;
+          color: var(--primary-text-color);
+          font-size: 0.9em;
+          border-bottom: 2px solid var(--primary-color);
+        }
+      </style>
+
+      <div class="potential-meals-container">
+        {% if items and items | length > 0 %}
+          <div class="category-header">
+            📋 Ready to Schedule
+          </div>
+          <ul class="meal-list">
+            {% for item in items %}
+              <li class="meal-item">
+                <span class="meal-icon">🍴</span>
+                <span class="meal-name">{{ item }}</span>
+                <span class="meal-number">#{{ loop.index }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="empty-state">
+            <div class="empty-icon">📭</div>
+            <div class="empty-text">No potential meals yet. Add some ideas!</div>
+          </div>
+        {% endif %}
+      </div>
+    card_mod:
+      style: |
+        ha-card {
+          padding: 0;
+          overflow: hidden;
+        }
+
+  # Statistics Card
+  - type: markdown
+    content: |
+      {% set count = states('sensor.meal_planner_potential') | int %}
+
+      <style>
+        .stats-footer {
+          display: flex;
+          justify-content: space-around;
+          padding: 16px;
+          background: var(--secondary-background-color);
+          border-top: 2px solid var(--divider-color);
+        }
+        .stat-box {
+          text-align: center;
+          flex: 1;
+        }
+        .stat-icon {
+          font-size: 2em;
+          margin-bottom: 8px;
+        }
+        .stat-title {
+          font-size: 0.75em;
+          color: var(--secondary-text-color);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          font-weight: 600;
+        }
+        .stat-value {
+          font-size: 1.8em;
+          font-weight: bold;
+          color: var(--primary-color);
+          margin-top: 4px;
+        }
+        .divider {
+          width: 1px;
+          background: var(--divider-color);
+          margin: 0 12px;
+        }
+      </style>
+
+      <div class="stats-footer">
+        <div class="stat-box">
+          <div class="stat-icon">📊</div>
+          <div class="stat-title">Total Ideas</div>
+          <div class="stat-value">{{ count }}</div>
+        </div>
+        <div class="divider"></div>
+        <div class="stat-box">
+          <div class="stat-icon">
+            {% if count == 0 %}
+              😴
+            {% elif count < 5 %}
+              🙂
+            {% elif count < 10 %}
+              😊
+            {% else %}
+              🎉
+            {% endif %}
+          </div>
+          <div class="stat-title">Status</div>
+          <div class="stat-value" style="font-size: 1.2em; margin-top: 8px;">
+            {% if count == 0 %}
+              Empty
+            {% elif count < 5 %}
+              Good
+            {% elif count < 10 %}
+              Great
+            {% else %}
+              Excellent
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    card_mod:
+      style: |
+        ha-card {
+          padding: 0;
+          box-shadow: none;
+        }
+
+  # Quick Actions
+  - type: horizontal-stack
+    cards:
+      - type: button
+        name: Clear All
+        icon: mdi:delete-sweep-outline
+        tap_action:
+          action: call-service
+          service: meal_planner.clear_potential
+          data: {}
+        hold_action:
+          action: none
+        card_mod:
+          style: |
+            ha-card {
+              background: var(--error-color);
+              opacity: 0.8;
+            }
+
+      - type: button
+        name: Add Meal
+        icon: mdi:plus-circle-outline
+        tap_action:
+          action: call-service
+          service: meal_planner.add
+          data:
+            name: "New Meal Idea"
+            meal_time: "Dinner"
+        hold_action:
+          action: none
+        card_mod:
+          style: |
+            ha-card {
+              background: var(--success-color);
+              opacity: 0.8;
+            }
+
+# ALTERNATIVE VERSION 1: Simple List (without card_mod)
+# Replace the entire configuration above with this simpler version:
+#
+# type: vertical-stack
+# cards:
+#   - type: markdown
+#     content: |
+#       # 💡 Potential Meals
+#       **{{ states('sensor.meal_planner_potential') }} unscheduled meals**
+#
+#   - type: markdown
+#     content: |
+#       {% set items = state_attr('sensor.meal_planner_potential', 'items') %}
+#       {% if items and items | length > 0 %}
+#       {% for item in items %}
+#       - 🍴 **{{ item }}**
+#       {% endfor %}
+#       {% else %}
+#       *No potential meals yet. Add some ideas!*
+#       {% endif %}
+#
+#   - type: entities
+#     entities:
+#       - entity: sensor.meal_planner_potential
+#         name: Total Potential Meals
+
+# ALTERNATIVE VERSION 2: Compact Card with Entity List
+# This version uses the standard entities card for a more compact display:
+#
+# type: entities
+# title: 💡 Potential Meals
+# show_header_toggle: false
+# entities:
+#   - entity: sensor.meal_planner_potential
+#     name: Unscheduled Meals
+#     icon: mdi:counter
+#   - type: section
+#     label: Meal Ideas
+#   - type: custom:hui-element
+#     card_type: markdown
+#     content: |
+#       {% set items = state_attr('sensor.meal_planner_potential', 'items') %}
+#       {% if items and items | length > 0 %}
+#       {% for item in items %}
+#       - {{ item }}
+#       {% endfor %}
+#       {% else %}
+#       *No meals in the queue*
+#       {% endif %}
+
+# ALTERNATIVE VERSION 3: Auto-entities Dynamic List
+# NOTE: Requires custom:auto-entities card from HACS
+# This version dynamically creates entity rows for each potential meal:
+#
+# type: custom:auto-entities
+# card:
+#   type: entities
+#   title: 💡 Potential Meals ({{ states('sensor.meal_planner_potential') }})
+#   show_header_toggle: false
+# filter:
+#   template: |
+#     {% set items = state_attr('sensor.meal_planner_potential', 'items') %}
+#     {% for item in items %}
+#     {
+#       "type": "custom:template-entity-row",
+#       "name": "{{ item }}",
+#       "icon": "mdi:food",
+#       "state": "#{{ loop.index }}"
+#     },
+#     {% endfor %}
