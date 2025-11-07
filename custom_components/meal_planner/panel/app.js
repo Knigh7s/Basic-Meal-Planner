@@ -382,9 +382,10 @@ class MealPlannerApp {
     // Filter by search query
     let filteredMeals = library;
     if (this.searchQuery) {
-      filteredMeals = library.filter(meal =>
-        meal.toLowerCase().includes(this.searchQuery)
-      );
+      filteredMeals = library.filter(meal => {
+        const mealName = typeof meal === 'string' ? meal : meal.name;
+        return mealName.toLowerCase().includes(this.searchQuery);
+      });
     }
 
     if (filteredMeals.length === 0) {
@@ -396,7 +397,7 @@ class MealPlannerApp {
         <div class="empty-state">
           <div class="empty-icon">📚</div>
           <div class="empty-text">${message}</div>
-          <div class="empty-hint">Add meals with or without dates to build your library</div>
+          <div class="empty-hint">Add meals to build your library</div>
         </div>
       `;
       return;
@@ -405,12 +406,26 @@ class MealPlannerApp {
     let html = '<div class="cards-grid">';
 
     filteredMeals.forEach(meal => {
-      const mealData = JSON.stringify({ name: meal, date: '' });
+      // Handle both string and object formats
+      const mealName = typeof meal === 'string' ? meal : meal.name;
+      const recipeUrl = typeof meal === 'object' ? meal.recipe_url || '' : '';
+      const notes = typeof meal === 'object' ? meal.notes || '' : '';
+
+      const mealData = JSON.stringify({
+        name: mealName,
+        date: '',
+        meal_time: 'Dinner',
+        recipe_url: recipeUrl,
+        notes: notes
+      });
+
       html += `
         <div class="meal-card">
           <div class="meal-card-header">
-            <div class="meal-card-title">${this.escapeHtml(meal)}</div>
+            <div class="meal-card-title">${this.escapeHtml(mealName)}</div>
           </div>
+          ${notes ? `<div class="meal-card-notes">${this.escapeHtml(notes)}</div>` : ''}
+          ${recipeUrl ? `<div class="meal-card-meta"><a href="${this.escapeHtml(recipeUrl)}" target="_blank">View Recipe</a></div>` : ''}
           <div class="meal-card-actions">
             <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}'>Schedule</button>
           </div>
@@ -491,23 +506,9 @@ class MealPlannerApp {
     } else {
       // Add mode
       title.textContent = isPotential ? 'Add Potential Meal' : 'Add Meal';
-      if (isPotential) {
-        document.getElementById('meal-date').value = '';
-      } else {
-        // Set default date to today
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('meal-date').value = today;
-      }
+      // Leave date blank - user chooses if they want to schedule it
+      document.getElementById('meal-date').value = '';
     }
-
-    // Populate meal suggestions from library
-    const datalist = document.getElementById('meal-suggestions');
-    datalist.innerHTML = '';
-    (this.data.library || []).forEach(meal => {
-      const option = document.createElement('option');
-      option.value = meal;
-      datalist.appendChild(option);
-    });
 
     modal.classList.remove('hidden');
   }

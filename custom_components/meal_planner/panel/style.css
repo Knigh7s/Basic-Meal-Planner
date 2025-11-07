@@ -243,6 +243,15 @@ body {
   color: var(--secondary-text-color, #757575);
 }
 
+.meal-card-meta a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.meal-card-meta a:hover {
+  text-decoration: underline;
+}
+
 .meal-card-notes {
   color: var(--secondary-text-color, #757575);
   font-size: 0.9em;
