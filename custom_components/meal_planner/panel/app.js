@@ -36,32 +36,91 @@ class MealPlannerApp {
 
   async connectToHass() {
     return new Promise((resolve) => {
-      // Try to get existing connection
-      if (window.hassConnection) {
-        this.hass = window.hassConnection;
-        console.log('[Meal Planner] Using existing HASS connection');
-        resolve();
-        return;
+      // Try multiple methods to get Home Assistant connection
+
+      // Method 1: Check parent window for hass object (for iframe panels)
+      if (window.parent && window.parent !== window) {
+        try {
+          if (window.parent.customElements && window.parent.customElements.get('home-assistant')) {
+            const homeAssistant = window.parent.document.querySelector('home-assistant');
+            if (homeAssistant && homeAssistant.hass) {
+              this.hass = homeAssistant.hass;
+              console.log('[Meal Planner] Connected via parent home-assistant element');
+              resolve();
+              return;
+            }
+          }
+        } catch (e) {
+          console.log('[Meal Planner] Cannot access parent window:', e.message);
+        }
       }
 
-      // Wait for connection
+      // Method 2: Wait for parent connection
+      let attempts = 0;
       const checkConnection = setInterval(() => {
+        attempts++;
+
+        // Try parent window
+        try {
+          if (window.parent && window.parent !== window) {
+            const homeAssistant = window.parent.document.querySelector('home-assistant');
+            if (homeAssistant && homeAssistant.hass) {
+              this.hass = homeAssistant.hass;
+              console.log('[Meal Planner] Connected to parent HASS');
+              clearInterval(checkConnection);
+              resolve();
+              return;
+            }
+          }
+        } catch (e) {
+          // Cannot access parent
+        }
+
+        // Try window.hassConnection
         if (window.hassConnection) {
           this.hass = window.hassConnection;
-          console.log('[Meal Planner] HASS connection established');
+          console.log('[Meal Planner] Connected via window.hassConnection');
           clearInterval(checkConnection);
+          resolve();
+          return;
+        }
+
+        // Timeout after 50 attempts (5 seconds)
+        if (attempts >= 50) {
+          clearInterval(checkConnection);
+          console.warn('[Meal Planner] Connection timeout - using fetch API fallback');
+          this.hass = { useFetchAPI: true };
           resolve();
         }
       }, 100);
-
-      // Timeout after 10 seconds
-      setTimeout(() => {
-        clearInterval(checkConnection);
-        console.warn('[Meal Planner] HASS connection timeout - using demo mode');
-        this.hass = null;
-        resolve();
-      }, 10000);
     });
+  }
+
+  async callService(type, data = {}) {
+    // Use WebSocket API if available
+    if (this.hass && this.hass.callWS && !this.hass.useFetchAPI) {
+      return await this.hass.callWS({ type, ...data });
+    }
+
+    // Fallback to fetch API
+    try {
+      const response = await fetch('/api/websocket', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ type, ...data })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('[Meal Planner] Fetch API failed:', error);
+      throw error;
+    }
   }
 
   async loadData() {
@@ -73,9 +132,7 @@ class MealPlannerApp {
     try {
       console.log('[Meal Planner] Loading data from backend...');
 
-      const response = await this.hass.callWS({
-        type: 'meal_planner/get'
-      });
+      const response = await this.callService('meal_planner/get');
 
       if (response) {
         this.data = response;
@@ -95,10 +152,7 @@ class MealPlannerApp {
     try {
       console.log('[Meal Planner] Saving data to backend...');
 
-      await this.hass.callWS({
-        type: 'meal_planner/bulk',
-        data: this.data
-      });
+      await this.callService('meal_planner/bulk', { data: this.data });
 
       console.log('[Meal Planner] Data saved successfully');
       return true;
@@ -117,10 +171,7 @@ class MealPlannerApp {
     try {
       console.log('[Meal Planner] Adding meal:', meal);
 
-      await this.hass.callWS({
-        type: 'meal_planner/add',
-        ...meal
-      });
+      await this.callService('meal_planner/add', meal);
 
       // Reload data
       await this.loadData();
@@ -143,8 +194,7 @@ class MealPlannerApp {
     try {
       console.log('[Meal Planner] Updating meal:', { oldMeal, newMeal });
 
-      await this.hass.callWS({
-        type: 'meal_planner/update',
+      await this.callService('meal_planner/update', {
         old_name: oldMeal.name,
         old_date: oldMeal.date || '',
         ...newMeal
