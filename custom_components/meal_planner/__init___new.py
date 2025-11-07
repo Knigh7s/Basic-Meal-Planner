@@ -1,0 +1,588 @@
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from datetime import datetime, timedelta, date
+from typing import Optional
+import uuid
+
+from homeassistant.components.http import StaticPathConfig
+from homeassistant.components import frontend
+from homeassistant.components.frontend import (
+    async_remove_panel,
+)
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.helpers.storage import Store
+from homeassistant.components.sensor import SensorEntity
+from homeassistant.helpers.entity_component import EntityComponent
+from homeassistant.core import callback
+
+from .const import (
+    DOMAIN,
+    STORAGE_FILE,
+    STORAGE_DIR,
+    EVENT_UPDATED,
+    MAX_NAME_LENGTH,
+    MAX_NOTES_LENGTH,
+    MAX_URL_LENGTH,
+    MAX_LIBRARY_SIZE,
+    MAX_SCHEDULED_SIZE,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+# ----------------------------
+# In-memory defaults / helpers
+# ----------------------------
+
+DEFAULT_DATA = {
+    "settings": {"week_start": "Sunday"},
+    "scheduled": [],  # list of entries with id, name, meal_time, date, recipe_url, notes
+    "library": [],    # list of {name, recipe_url, notes}
+}
+
+MEAL_TIME_ORDER = {"Breakfast": 0, "Lunch": 1, "Dinner": 2, "Snack": 3}
+
+
+def _current_week_bounds(today: date, week_start: str) -> tuple[date, date]:
+    week_start = (week_start or "Sunday").title()
+    if week_start == "Monday":
+        start = today - timedelta(days=today.weekday())
+    else:
+        start = today - timedelta(days=(today.weekday() + 1) % 7)
+    end = start + timedelta(days=6)
+    return start, end
+
+
+def _parse_date(s: str) -> Optional[date]:
+    if not s:
+        return None
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+
+def _upsert_library(data: dict, name: str, recipe_url: str, notes: str):
+    key = (name or "").strip().lower()
+    if not key:
+        return
+    lib = data.setdefault("library", [])
+
+    # Enforce library size limit
+    if len(lib) >= MAX_LIBRARY_SIZE:
+        # Remove oldest entry if at limit
+        lib.pop(0)
+
+    for item in lib:
+        if (item.get("name", "").strip().lower()) == key:
+            if recipe_url:
+                item["recipe_url"] = recipe_url
+            if notes:
+                item["notes"] = notes
+            return
+    lib.append({"name": name.strip(), "recipe_url": recipe_url, "notes": notes})
+
+
+def _validate_date(date_str: str) -> Optional[str]:
+    """Validate ISO date format (YYYY-MM-DD). Returns validated string or None."""
+    if not date_str or not date_str.strip():
+        return None
+    try:
+        parsed = datetime.strptime(date_str.strip(), "%Y-%m-%d").date()
+        return parsed.isoformat()
+    except (ValueError, TypeError):
+        _LOGGER.warning("Invalid date format: %s (expected YYYY-MM-DD)", date_str)
+        return None
+
+
+def _validate_url(url: str) -> str:
+    """Validate and sanitize URL. Returns sanitized URL or empty string."""
+    url = (url or "").strip()
+    if not url:
+        return ""
+    if len(url) > MAX_URL_LENGTH:
+        _LOGGER.warning("URL too long (%d chars), truncating to %d", len(url), MAX_URL_LENGTH)
+        url = url[:MAX_URL_LENGTH]
+    if not url.startswith(("http://", "https://")):
+        _LOGGER.warning("Invalid URL protocol (must be http/https): %s", url[:50])
+        return ""
+    # Remove null bytes
+    url = url.replace("\x00", "")
+    return url
+
+
+def _sanitize_string(value: str, max_length: int, field_name: str = "field") -> str:
+    """Sanitize and truncate string input."""
+    value = (value or "").strip()
+    # Remove null bytes
+    value = value.replace("\x00", "")
+    if len(value) > max_length:
+        _LOGGER.warning("%s too long (%d chars), truncating to %d", field_name, len(value), max_length)
+        value = value[:max_length]
+    return value
+
+
+def _enforce_scheduled_limits(data: dict):
+    """Enforce max scheduled meals limit. Remove oldest entries if needed."""
+    scheduled = data.get("scheduled", [])
+    if len(scheduled) <= MAX_SCHEDULED_SIZE:
+        return
+
+    # Sort by date (oldest first), potential meals (no date) go to end
+    def sort_key(m):
+        dt = _parse_date(m.get("date", ""))
+        return dt if dt else date.max
+
+    scheduled.sort(key=sort_key)
+    # Keep only the most recent MAX_SCHEDULED_SIZE entries
+    data["scheduled"] = scheduled[-MAX_SCHEDULED_SIZE:]
+    _LOGGER.info("Scheduled meals limit reached, removed %d oldest entries", len(scheduled) - MAX_SCHEDULED_SIZE)
+
+
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    return True
+
+
+# --------------
+# Sensor entities
+# --------------
+
+class PotentialMealsSensor(SensorEntity):
+    _attr_name = "Meal Planner Potential Meals"
+    _attr_icon = "mdi:lightbulb-outline"
+    _attr_should_poll = False
+
+    def __init__(self, hass: HomeAssistant, store: Store, data: dict, entry_id: str):
+        self.hass = hass
+        self.store = store
+        self.data = data
+        # unique per config entry to avoid collisions
+        self._attr_unique_id = f"{entry_id}_meal_planner_potential"
+        self._recalc()
+
+    def _recalc(self) -> None:
+        items = [
+            (m.get("name") or "")
+            for m in self.data.get("scheduled", [])
+            if not (m.get("date") or "").strip()
+        ]
+        items = [i for i in items if i]
+        self._attr_native_value = len(items)
+        self._attr_extra_state_attributes = {
+            "items": sorted(items, key=lambda s: s.lower())
+        }
+
+    async def async_update_from_data(self) -> None:
+        self._recalc()
+        self.async_write_ha_state()
+
+
+class WeeklyMealsSensor(SensorEntity):
+    _attr_name = "Meal Planner Weekly View"
+    _attr_icon = "mdi:calendar-week"
+    _attr_should_poll = False
+
+    def __init__(self, hass: HomeAssistant, store: Store, data: dict, entry_id: str):
+        self.hass = hass
+        self.store = store
+        self.data = data
+        self._attr_unique_id = f"{entry_id}_meal_planner_week"
+        self._recalc()
+
+    def _recalc(self) -> None:
+        today = datetime.now().date()
+        week_start = self.data.get("settings", {}).get("week_start", "Sunday")
+        start, end = _current_week_bounds(today, week_start)
+
+        days_order = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
+        day_labels = {
+            "sun": "Sun", "mon": "Mon", "tue": "Tue", "wed": "Wed",
+            "thu": "Thu", "fri": "Fri", "sat": "Sat",
+        }
+        grid = {
+            k: {"label": day_labels[k], "breakfast": "", "lunch": "", "dinner": "", "snack": ""}
+            for k in days_order
+        }
+
+        for m in self.data.get("scheduled", []):
+            ds = (m.get("date") or "").strip()
+            if not ds:
+                continue
+            try:
+                d = datetime.strptime(ds, "%Y-%m-%d").date()
+            except Exception:
+                continue
+
+            if start <= d <= end:
+                mapping = {6: "sun", 0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat"}
+                k = mapping[d.weekday()]
+                slot = (m.get("meal_time") or "Dinner").strip().lower()
+                if slot in ("breakfast", "lunch", "dinner", "snack"):
+                    grid[k][slot] = m.get("name", "")
+
+        self._attr_native_value = f"{start.isoformat()} to {end.isoformat()}"
+        self._attr_extra_state_attributes = {
+            "week_start": week_start,
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "days": grid,
+        }
+
+    async def async_update_from_data(self) -> None:
+        self._recalc()
+        self.async_write_ha_state()
+
+
+# -------------------
+# Config entry setup
+# -------------------
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    # Ensure storage dir
+    store_dir = Path(hass.config.path(STORAGE_DIR))
+    store_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load data
+    store = Store(hass, 1, f"{STORAGE_DIR}/{STORAGE_FILE}")
+    data = await store.async_load()
+    if not isinstance(data, dict):
+        data = DEFAULT_DATA.copy()
+
+    # Normalize
+    data.setdefault("settings", {"week_start": "Sunday"})
+    data.setdefault("scheduled", [])
+    data.setdefault("library", [])
+    for m in data["scheduled"]:
+        m.setdefault("id", uuid.uuid4().hex)
+        m.setdefault("recipe_url", "")
+        m.setdefault("notes", "")
+        m.setdefault("meal_time", "Dinner")
+        m.setdefault("date", "")
+
+    # Save handles
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN].update({"store": store, "data": data})
+
+    # ---------- Sensors (guard against re-adding) ----------
+    sensors_added = hass.data[DOMAIN].get("sensors_added", False)
+    if not sensors_added:
+        pot_sensor = PotentialMealsSensor(hass, store, data, entry.entry_id)
+        week_sensor = WeeklyMealsSensor(hass, store, data, entry.entry_id)
+        try:
+            comp = EntityComponent(_LOGGER, "sensor", hass)
+            await comp.async_add_entities([pot_sensor, week_sensor], True)
+            hass.data[DOMAIN]["sensors"] = {"potential": pot_sensor, "week": week_sensor}
+            hass.data[DOMAIN]["sensors_added"] = True
+        except Exception as e:
+            _LOGGER.debug("Sensor registration error: %s", e)
+    else:
+        # Update existing sensors' view of data
+        sensors = hass.data[DOMAIN].get("sensors", {})
+        if "potential" in sensors:
+            await sensors["potential"].async_update_from_data()
+        if "week" in sensors:
+            await sensors["week"].async_update_from_data()
+
+    async def _save_and_notify():
+        await store.async_save(data)
+        sensors = hass.data[DOMAIN].get("sensors", {})
+        if "potential" in sensors:
+            await sensors["potential"].async_update_from_data()
+        if "week" in sensors:
+            await sensors["week"].async_update_from_data()
+        hass.bus.async_fire(EVENT_UPDATED)
+
+    # ---------- Services ----------
+    async def svc_add(call: ServiceCall):
+        # Validate and sanitize inputs
+        name = _sanitize_string(call.data.get("name", ""), MAX_NAME_LENGTH, "meal name")
+        if not name:
+            _LOGGER.warning("Meal name is required")
+            return
+
+        meal_time = (call.data.get("meal_time") or "Dinner").strip().title()
+        if meal_time not in ("Breakfast", "Lunch", "Dinner", "Snack"):
+            meal_time = "Dinner"
+
+        # Validate date format
+        date_str = call.data.get("date", "")
+        if date_str:
+            validated_date = _validate_date(date_str)
+            date_str = validated_date if validated_date else ""
+
+        recipe_url = _validate_url(call.data.get("recipe_url", ""))
+        notes = _sanitize_string(call.data.get("notes", ""), MAX_NOTES_LENGTH, "notes")
+
+        _upsert_library(data, name, recipe_url, notes)
+        data["scheduled"].append({
+            "id": uuid.uuid4().hex,
+            "name": name,
+            "meal_time": meal_time,
+            "date": date_str,
+            "recipe_url": recipe_url,
+            "notes": notes,
+        })
+
+        # Enforce limits
+        _enforce_scheduled_limits(data)
+        await _save_and_notify()
+
+    hass.services.async_register(DOMAIN, "add", svc_add)
+
+    async def svc_update(call: ServiceCall):
+        row_id = (call.data.get("row_id") or "").strip()
+        if not row_id:
+            return
+
+        valid_times = ("Breakfast", "Lunch", "Dinner", "Snack")
+        updated = False
+        for m in data["scheduled"]:
+            if m.get("id") == row_id:
+                # Update only provided fields with validation
+                if "name" in call.data:
+                    name = _sanitize_string(call.data.get("name", ""), MAX_NAME_LENGTH, "meal name")
+                    if name:
+                        m["name"] = name
+                        updated = True
+                if "meal_time" in call.data:
+                    mt = (call.data.get("meal_time") or "").strip().title()
+                    if mt in valid_times:
+                        m["meal_time"] = mt
+                        updated = True
+                if "date" in call.data:
+                    date_str = call.data.get("date", "")
+                    if date_str:
+                        validated_date = _validate_date(date_str)
+                        m["date"] = validated_date if validated_date else ""
+                    else:
+                        m["date"] = ""
+                    updated = True
+                if "recipe_url" in call.data:
+                    m["recipe_url"] = _validate_url(call.data.get("recipe_url", ""))
+                    updated = True
+                if "notes" in call.data:
+                    m["notes"] = _sanitize_string(call.data.get("notes", ""), MAX_NOTES_LENGTH, "notes")
+                    updated = True
+                break
+
+        if updated:
+            await _save_and_notify()
+
+    hass.services.async_register(DOMAIN, "update", svc_update)
+
+    async def svc_bulk(call: ServiceCall):
+        action = (call.data.get("action") or "").lower()
+        ids = list(call.data.get("ids") or [])
+        date_str = call.data.get("date", "")
+        meal_time_in = (call.data.get("meal_time") or "").strip().title() or None
+
+        if action not in ("convert_to_potential", "assign_date", "delete"):
+            return
+
+        # Validate date if provided for assign_date action
+        if action == "assign_date" and date_str:
+            validated_date = _validate_date(date_str)
+            if not validated_date:
+                _LOGGER.warning("Invalid date for bulk assign: %s", date_str)
+                return
+            date_str = validated_date
+
+        idset = set(ids)
+        new_list = []
+
+        for m in data["scheduled"]:
+            if m["id"] not in idset:
+                new_list.append(m)
+                continue
+
+            if action == "convert_to_potential":
+                m["date"] = ""
+                new_list.append(m)
+
+            elif action == "assign_date":
+                if date_str:
+                    m["date"] = date_str
+                if meal_time_in in ("Breakfast", "Lunch", "Dinner", "Snack"):
+                    m["meal_time"] = meal_time_in
+                new_list.append(m)
+
+            elif action == "delete":
+                # drop this row
+                pass
+
+        data["scheduled"] = new_list
+        await _save_and_notify()
+
+    hass.services.async_register(DOMAIN, "bulk", svc_bulk)
+
+    async def svc_clear_potential(call: ServiceCall):
+        data["scheduled"] = [m for m in data["scheduled"] if (m.get("date") or "").strip()]
+        await _save_and_notify()
+
+    hass.services.async_register(DOMAIN, "clear_potential", svc_clear_potential)
+
+    async def svc_clear_week(call: ServiceCall):
+        today = datetime.now().date()
+        start, end = _current_week_bounds(today, data["settings"]["week_start"])
+        kept = []
+        for m in data["scheduled"]:
+            dt = _parse_date(m.get("date", ""))
+            if dt and start <= dt <= end:
+                continue
+            kept.append(m)
+        data["scheduled"] = kept
+        await _save_and_notify()
+
+    hass.services.async_register(DOMAIN, "clear_week", svc_clear_week)
+
+    async def svc_promote_future(call: ServiceCall):
+        hass.bus.async_fire(EVENT_UPDATED)
+
+    hass.services.async_register(DOMAIN, "promote_future_to_week", svc_promote_future)
+
+    # ---------- WebSocket commands ----------
+    from homeassistant.components import websocket_api
+
+    @websocket_api.websocket_command({"type": f"{DOMAIN}/get"})
+    @callback
+    def ws_get(hass, connection, msg):
+        connection.send_result(msg["id"], {
+            "settings": data.get("settings", {"week_start": "Sunday"}),
+            "rows": data.get("scheduled", []),
+            "library": data.get("library", []),
+        })
+
+    @websocket_api.websocket_command({"type": f"{DOMAIN}/add", "name": str, "meal_time": str, "date": str, "recipe_url": str, "notes": str})
+    @callback
+    def ws_add(hass, connection, msg):
+        hass.async_create_task(hass.services.async_call(DOMAIN, "add", {
+            "name": msg.get("name",""),
+            "meal_time": msg.get("meal_time","Dinner"),
+            "date": msg.get("date",""),
+            "recipe_url": msg.get("recipe_url",""),
+            "notes": msg.get("notes",""),
+        }))
+        connection.send_result(msg["id"], {"queued": True})
+
+    @websocket_api.websocket_command({
+        "type": f"{DOMAIN}/update",
+        "row_id": str,
+        # the rest are optional; only update what is provided
+        "name": str,
+        "meal_time": str,
+        "date": str,
+        "recipe_url": str,
+        "notes": str,
+    })
+    @callback
+    def ws_update(hass, connection, msg):
+        payload = {
+            "row_id": msg.get("row_id", ""),
+        }
+        for k in ("name", "meal_time", "date", "recipe_url", "notes"):
+            if k in msg:
+                payload[k] = msg.get(k, "")
+
+        hass.async_create_task(
+            hass.services.async_call(DOMAIN, "update", payload)
+        )
+        connection.send_result(msg["id"], {"queued": True})
+
+    @websocket_api.websocket_command({"type": f"{DOMAIN}/bulk", "action": str, "ids": list, "date": str, "meal_time": str})
+    @callback
+    def ws_bulk(hass, connection, msg):
+        hass.async_create_task(hass.services.async_call(DOMAIN, "bulk", {
+            "action": msg.get("action",""),
+            "ids": msg.get("ids",[]),
+            "date": msg.get("date",""),
+            "meal_time": msg.get("meal_time",""),
+        }))
+        connection.send_result(msg["id"], {"queued": True})
+
+    websocket_api.async_register_command(hass, ws_get)
+    websocket_api.async_register_command(hass, ws_add)
+    websocket_api.async_register_command(hass, ws_update)
+    websocket_api.async_register_command(hass, ws_bulk)
+
+    # ---------- Serve static assets for panel and cards ----------
+    dist_dir = Path(__file__).parent / "dist"
+
+    # Serve the dist directory for panel and cards
+    await hass.http.async_register_static_paths(
+        [
+            StaticPathConfig(
+                url_path=f"/{DOMAIN}/dist",
+                path=str(dist_dir),
+                cache_headers=False,  # Disable caching during development
+            )
+        ]
+    )
+    _LOGGER.info("Meal Planner: assets served from %s", dist_dir)
+
+    # ---------- Register Custom Panel (NOT iframe) ----------
+    panel_id = "meal-planner"
+    add_sidebar = entry.options.get("add_sidebar", True)
+
+    try:
+        await async_remove_panel(hass, panel_id)  # safe if not present
+    except Exception:
+        pass
+
+    if add_sidebar:
+        try:
+            # Register as custom panel (requires HA to load our JS module)
+            # The panel JS will be loaded from /meal_planner/dist/panel.js
+            await hass.async_add_executor_job(
+                frontend.async_register_built_in_panel,
+                hass,
+                "custom",  # component_name is 'custom' for custom panels
+                "Meal Planner",  # sidebar_title
+                "mdi:silverware-fork-knife",  # sidebar_icon
+                panel_id,  # frontend_url_path
+                {  # config
+                    "name": "meal-planner-panel",
+                    "_panel_custom": {
+                        "name": "meal-planner-panel",
+                        "embed_iframe": False,
+                        "trust_external_script": False,
+                        "js_url": f"/{DOMAIN}/dist/panel.js",
+                    },
+                },
+                False,  # require_admin
+            )
+            _LOGGER.info("Meal Planner: custom panel '%s' registered", panel_id)
+        except Exception as e:
+            _LOGGER.error("Meal Planner: failed to register custom panel: %s", e)
+    else:
+        _LOGGER.info("Meal Planner: sidebar option disabled; panel not registered")
+
+    # ---------- Register Custom Lovelace Cards ----------
+    # Cards will auto-register when the cards.js bundle is loaded
+    # We need to tell HA to load our cards bundle
+    hass.data[DOMAIN]["cards_loaded"] = False
+
+    # Add our cards.js to the frontend resources
+    # This makes the cards available in the Lovelace UI
+    try:
+        await hass.async_add_executor_job(
+            frontend.add_extra_js_url,
+            hass,
+            f"/{DOMAIN}/dist/cards.js",
+        )
+        hass.data[DOMAIN]["cards_loaded"] = True
+        _LOGGER.info("Meal Planner: custom cards registered")
+    except Exception as e:
+        _LOGGER.error("Meal Planner: failed to register custom cards: %s", e)
+
+    return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    try:
+        await async_remove_panel(hass, "meal-planner")
+    except Exception:
+        pass
+    hass.data.pop(DOMAIN, None)
+    return True
