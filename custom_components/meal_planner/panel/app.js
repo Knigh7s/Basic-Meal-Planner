@@ -540,7 +540,7 @@ class MealPlannerApp {
       name,
       date: date || '',
       meal_time: mealTime.toLowerCase(),
-      recipe: recipe || '',
+      recipe_url: recipe || '',
       notes: notes || ''
     };
 

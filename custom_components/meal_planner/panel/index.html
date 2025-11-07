@@ -5,6 +5,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Meal Planner</title>
   <link rel="stylesheet" href="./style.css">
+  <script>
+    // Inject CSS variables from parent Home Assistant window
+    (function() {
+      try {
+        if (window.parent && window.parent !== window) {
+          const parentStyles = window.parent.getComputedStyle(window.parent.document.documentElement);
+          const cssVars = [
+            '--primary-color', '--primary-background-color', '--secondary-background-color',
+            '--card-background-color', '--primary-text-color', '--secondary-text-color',
+            '--text-primary-color', '--divider-color', '--accent-color',
+            '--ha-card-border-radius', '--ha-card-box-shadow', '--mdc-theme-primary',
+            '--lovelace-background', '--sidebar-background-color', '--disabled-text-color',
+            '--table-row-background-hover-color', '--dark-primary-color'
+          ];
+
+          cssVars.forEach(varName => {
+            const value = parentStyles.getPropertyValue(varName);
+            if (value) {
+              document.documentElement.style.setProperty(varName, value);
+            }
+          });
+        }
+      } catch (e) {
+        console.log('[Meal Planner] Cannot access parent styles:', e.message);
+      }
+    })();
+  </script>
 </head>
 <body>
   <div id="app">
