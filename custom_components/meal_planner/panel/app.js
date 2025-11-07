@@ -1,615 +1,572 @@
-// =====================
-// Helper functions
-// =====================
-function $(selector) {
-  return document.getElementById(selector.replace(/^#/, ''));
-}
+// Meal Planner Panel App
+// Vanilla JavaScript with WebSocket integration
 
-// =====================
-// Home Assistant WS helpers
-// =====================
-async function getHAConnection() {
-  // Prefer the HA shell connection exposed to iframes
-  if (window.parent && window.parent.hassConnection) {
-    const hc = await window.parent.hassConnection; // resolves to {conn, auth}
-    return hc.conn ?? hc;
-  }
-  throw new Error("Open Meal Planner from the Home Assistant sidebar so authentication is handled.");
-}
+class MealPlannerApp {
+  constructor() {
+    this.hass = null;
+    this.data = {
+      settings: { week_start: 'sunday' },
+      scheduled: {},
+      library: []
+    };
+    this.currentView = 'dashboard';
+    this.editingMeal = null;
+    this.searchQuery = '';
 
-async function callWS(type, payload = {}) {
-  const conn = await getHAConnection();
-  if (typeof conn.sendMessagePromise !== "function") {
-    throw new Error("HA connection not ready (sendMessagePromise missing)");
-  }
-  return conn.sendMessagePromise({ type, ...payload });
-}
-
-// convenience wrapper if you prefer the {type,...} style
-async function haWS(msg) {
-  const { type, ...rest } = msg || {};
-  return callWS(type, rest);
-}
-
-// =====================
-// State
-// =====================
-let allData = {
-  settings: { week_start: "Sunday" },
-  rows: [],
-  library: [],
-};
-
-let currentEditId = null; // track the row being edited (null = adding)
-
-// =====================
-// Date utilities
-// =====================
-function parseISODate(s) {
-  if (!s) return null;
-  const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function startOfWeek(d, weekStart = "Sunday") {
-  const day = d.getDay(); // 0 Sun - 6 Sat
-  const isMonday = (weekStart || "Sunday").toLowerCase() === "monday";
-  // Compute offset so we land on correct week start
-  const offset = isMonday ? (day === 0 ? -6 : 1 - day) : -day;
-  const res = new Date(d);
-  res.setHours(0, 0, 0, 0);
-  res.setDate(res.getDate() + offset);
-  return res;
-}
-
-function endOfWeek(d, weekStart = "Sunday") {
-  const sow = startOfWeek(d, weekStart);
-  const res = new Date(sow);
-  res.setDate(sow.getDate() + 6);
-  res.setHours(23, 59, 59, 999);
-  return res;
-}
-
-function isInPastWeek(dt, weekStart = "Sunday") {
-  if (!dt) return false;
-  const today = new Date();
-  const thisWeekStart = startOfWeek(today, weekStart);
-  return dt < thisWeekStart; // strictly before current week
-}
-
-function isInSameWeek(dt, anchor = new Date(), weekStart = "Sunday") {
-  if (!dt) return false;
-  const s1 = startOfWeek(anchor, weekStart).getTime();
-  const e1 = endOfWeek(anchor, weekStart).getTime();
-  const t = dt.getTime();
-  return t >= s1 && t <= e1;
-}
-
-function isInSameMonth(dt, anchor = new Date()) {
-  if (!dt) return false;
-  return dt.getFullYear() === anchor.getFullYear() && dt.getMonth() === anchor.getMonth();
-}
-
-// =====================
-// Fetch & Render
-// =====================
-async function loadMeals() {
-  console.log("loadMeals() - Fetching data from backend...");
-  const resp = await haWS({ type: "meal_planner/get" });
-  console.log("loadMeals() - Response received:", resp);
-  console.log("loadMeals() - Number of meals:", resp?.rows?.length || 0);
-  // resp = { settings, rows, library }
-  allData = resp || allData;
-  console.log("loadMeals() - allData updated:", allData);
-  renderTable();
-  populateDatalist();
-}
-
-function renderTable() {
-  console.log("renderTable() - Starting render...");
-  const tbody = document.querySelector("#allTable tbody");
-  if (!tbody) {
-    console.error("renderTable() - tbody not found!");
-    return;
+    this.init();
   }
 
-  const hidePast = $("#hidePast")?.checked;
-  const filterType = $("#filterType")?.value || "none";
-  const weekPicker = $("#weekPicker");
-  const monthPicker = $("#monthPicker");
-  const weekStart = (allData.settings?.week_start || "Sunday");
+  async init() {
+    console.log('[Meal Planner] Initializing app...');
 
-  console.log("renderTable() - Filters:", { hidePast, filterType, weekStart });
-  console.log("renderTable() - Total meals to render:", allData.rows?.length || 0);
+    // Wait for Home Assistant connection
+    await this.connectToHass();
 
-  // figure anchor for filters
-  let weekAnchor = new Date();
-  if (weekPicker && !weekPicker.classList.contains("hidden") && weekPicker.value) {
-    const [y, w] = weekPicker.value.split("-W");
-    if (y && w) {
-      const jan4 = new Date(Number(y), 0, 4);
-      const dayOfWeek = jan4.getDay() || 7;
-      const thurs = new Date(jan4);
-      thurs.setDate(jan4.getDate() - dayOfWeek + 1 + (Number(w) - 1) * 7);
-      weekAnchor = thurs;
-    }
+    // Load initial data
+    await this.loadData();
+
+    // Setup event listeners
+    this.setupEventListeners();
+
+    // Render initial view
+    this.switchView('dashboard');
+
+    console.log('[Meal Planner] App initialized successfully');
   }
 
-  let monthAnchor = new Date();
-  if (monthPicker && !monthPicker.classList.contains("hidden") && monthPicker.value) {
-    const [y, m] = monthPicker.value.split("-");
-    if (y && m) monthAnchor = new Date(Number(y), Number(m) - 1, 1);
-  }
-
-  const frag = document.createDocumentFragment();
-  const selectAll = $("#selectAll");
-  if (selectAll) selectAll.checked = false;
-  tbody.innerHTML = "";
-
-  let renderedCount = 0;
-  let filteredCount = 0;
-
-  for (const row of allData.rows || []) {
-    const dt = parseISODate(row.date);
-    const isPotential = !row.date;
-
-    console.log(`renderTable() - Processing meal: "${row.name}", date: ${row.date}, isPotential: ${isPotential}`);
-
-    // Hide past week (only scheduled items)
-    if (hidePast && !isPotential && isInPastWeek(dt, weekStart)) {
-      console.log(`  -> Filtered out (past week)`);
-      filteredCount++;
-      continue;
-    }
-
-    // Filters
-    if (filterType === "week") {
-      if (!isPotential && !isInSameWeek(dt, weekAnchor, weekStart)) {
-        console.log(`  -> Filtered out (not in selected week)`);
-        filteredCount++;
-        continue;
+  async connectToHass() {
+    return new Promise((resolve) => {
+      // Try to get existing connection
+      if (window.hassConnection) {
+        this.hass = window.hassConnection;
+        console.log('[Meal Planner] Using existing HASS connection');
+        resolve();
+        return;
       }
-      if (isPotential) {
-        console.log(`  -> Filtered out (potential meal when week filter active)`);
-        filteredCount++;
-        continue;
-      }
-    } else if (filterType === "month") {
-      if (!isPotential && !isInSameMonth(dt, monthAnchor)) {
-        console.log(`  -> Filtered out (not in selected month)`);
-        filteredCount++;
-        continue;
-      }
-      if (isPotential) {
-        console.log(`  -> Filtered out (potential meal when month filter active)`);
-        filteredCount++;
-        continue;
-      }
-    }
 
-    console.log(`  -> Rendering meal to table`);
-    renderedCount++;
-
-    const tr = document.createElement("tr");
-    if (isPotential) tr.classList.add("is-potential"); // grey background via your CSS
-
-    // [0] checkbox
-    const tdCheck = document.createElement("td");
-    tdCheck.className = "narrow";
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.className = "row-select";
-    cb.dataset.id = row.id;
-    tdCheck.appendChild(cb);
-    tr.appendChild(tdCheck);
-
-    // [1] Name
-    const tdName = document.createElement("td");
-    tdName.append(document.createTextNode(row.name || ""));
-    const editBtn = document.createElement("button");
-    editBtn.className = "icon-edit";
-    editBtn.title = "Edit";
-    editBtn.dataset.id = row.id;
-    editBtn.textContent = "✎";
-    tdName.append(" ", editBtn);
-    tr.appendChild(tdName);
-
-    // [2] Meal Time
-    const tdMeal = document.createElement("td");
-    tdMeal.textContent = isPotential ? "—" : (row.meal_time || "Dinner");
-    tr.appendChild(tdMeal);
-
-    // [3] Date
-    const tdDate = document.createElement("td");
-    tdDate.textContent = isPotential ? "—" : (row.date || "—");
-    tr.appendChild(tdDate);
-
-    // [4] Recipe → button if link exists
-    const tdRecipe = document.createElement("td");
-    if (row.recipe_url && String(row.recipe_url).trim()) {
-      const btn = document.createElement("button");
-      btn.className = "linkbtn";
-      btn.dataset.href = row.recipe_url;
-      btn.textContent = "Open";
-      tdRecipe.appendChild(btn);
-    } else {
-      tdRecipe.textContent = "—";
-    }
-    tr.appendChild(tdRecipe);
-
-    // [5] Notes
-    const tdNotes = document.createElement("td");
-    tdNotes.textContent = row.notes || "—";
-    tr.appendChild(tdNotes);
-
-    frag.appendChild(tr);
-  }
-
-  tbody.appendChild(frag);
-  console.log(`renderTable() - Complete! Rendered: ${renderedCount}, Filtered: ${filteredCount}, Total: ${(allData.rows || []).length}`);
-  updateBulkUI();
-}
-
-// =====================
-// Datalist from library
-// =====================
-function populateDatalist() {
-  const dl = document.getElementById("meal_options");
-  if (!dl) return;
-  dl.innerHTML = "";
-  const names = new Set();
-  for (const m of allData.library || []) {
-    const n = (m.name || "").trim();
-    if (!n || names.has(n.toLowerCase())) continue;
-    names.add(n.toLowerCase());
-    const opt = document.createElement("option");
-    opt.value = n;
-    dl.appendChild(opt);
-  }
-}
-
-// =====================
-// Modal handlers
-// =====================
-function openAddModal() {
-  const m = document.getElementById("modal");
-  if (m) m.classList.remove("hidden");
-}
-function closeAddModal() {
-  const m = document.getElementById("modal");
-  if (m) m.classList.add("hidden");
-}
-
-
-// =====================
-// Actions
-// =====================
-async function saveMeal() {
-  console.log("saveMeal() called");
-
-  // Hyphenated IDs (as in your HTML)
-  const nameEl = document.getElementById("meal-name");
-  const dateEl = document.getElementById("meal-date");
-  const timeEl = document.getElementById("meal-time");
-  const linkEl = document.getElementById("meal-recipe");
-  const notesEl = document.getElementById("meal-notes");
-
-  console.log("Form elements found:", { nameEl, dateEl, timeEl, linkEl, notesEl });
-
-  const name = (nameEl?.value || "").trim();
-  if (!name) {
-    alert("Please enter a meal name.");
-    nameEl?.focus();
-    return;
-  }
-
-  const date = (dateEl?.value || "");
-  const meal = (timeEl?.value || "Dinner");
-  const recipe = (linkEl?.value || "");
-  const notes = (notesEl?.value || "");
-
-  console.log("Saving meal:", { name, date, meal, recipe, notes });
-
-  const btn = document.getElementById("save");
-  if (btn) btn.disabled = true;
-
-  try {
-    if (currentEditId) {
-      console.log("Updating existing meal:", currentEditId);
-      // Try true update (name/meal/date/recipe/notes). If backend lacks it, fallback to bulk date/time.
-      try {
-        await haWS({
-          type: "meal_planner/update",
-          row_id: currentEditId,
-          name, meal_time: meal, date, recipe_url: recipe, notes
-        });
-      } catch (e) {
-        const msg = (e && (e.code || e.message) || "") + "";
-        if (/unknown/i.test(msg)) {
-          await haWS({ type: "meal_planner/bulk", action: "assign_date", ids: [currentEditId], date, meal_time: meal });
-          // NOTE: fallback won't change name/recipe/notes (add backend update later to support that)
-        } else {
-          throw e;
+      // Wait for connection
+      const checkConnection = setInterval(() => {
+        if (window.hassConnection) {
+          this.hass = window.hassConnection;
+          console.log('[Meal Planner] HASS connection established');
+          clearInterval(checkConnection);
+          resolve();
         }
-      }
-      currentEditId = null;
-    } else {
-      // Add new
-      console.log("Adding new meal via WebSocket");
-      const response = await haWS({
-        type: "meal_planner/add",
-        name, meal_time: meal, date, recipe_url: recipe, notes
-      });
-      console.log("WebSocket response:", response);
-    }
+      }, 100);
 
-    closeAddModal();
-
-    // reset fields for next time
-    if (nameEl) nameEl.value = "";
-    if (dateEl) dateEl.value = "";
-    if (timeEl) timeEl.value = "Dinner";
-    if (linkEl) linkEl.value = "";
-    if (notesEl) notesEl.value = "";
-
-    console.log("Loading meals after save...");
-    await loadMeals();
-    console.log("Meals reloaded successfully");
-  } catch (err) {
-    console.error("Save failed", err);
-    alert("Unable to save meal: " + ((err && (err.message || err.code || err.error)) || String(err)));
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-}
-
-function getSelectedIds() {
-  return Array.from(document.querySelectorAll(".row-select:checked"))
-    .map((el) => el.dataset.id)
-    .filter(Boolean);
-}
-
-async function applyBulk() {
-  const action = $("#bulkAction")?.value || "";
-  const ids = getSelectedIds();
-  if (!action || ids.length === 0) {
-    alert("Select an action and at least one row.");
-    return;
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        clearInterval(checkConnection);
+        console.warn('[Meal Planner] HASS connection timeout - using demo mode');
+        this.hass = null;
+        resolve();
+      }, 10000);
+    });
   }
 
-  // Show confirmation for delete action
-  if (action === "delete") {
-    await showDeleteConfirmation(ids);
-    return;
-  }
-
-  const body = { action, ids };
-
-  if (action === "assign_date") {
-    const dateEl = $("#bulkDate");
-    const timeEl = $("#bulkTime");
-    const dateVal = dateEl?.value || "";
-    const timeVal = (timeEl?.value || "").trim();
-    if (!dateVal) {
-      alert("Choose a date for 'Assign date'.");
+  async loadData() {
+    if (!this.hass) {
+      console.warn('[Meal Planner] No HASS connection - using empty data');
       return;
     }
-    body.date = dateVal;
-    if (timeVal) body.meal_time = timeVal;
-  }
 
-  try {
-    await haWS({ type: "meal_planner/bulk", ...body });
-    await loadMeals();
-  } catch (err) {
-    console.error("Bulk action failed", err);
-    alert("Bulk action failed: " + ((err && (err.message || err.code || err.error)) || String(err)));
-  } finally {
-    // reset bulk UI
-    if ($("#bulkAction")) $("#bulkAction").value = "";
-    if ($("#bulkDate")) { $("#bulkDate").value = ""; $("#bulkDate").classList.add("hidden"); }
-    if ($("#bulkTime")) { $("#bulkTime").classList.add("hidden"); }
-  }
-}
+    try {
+      console.log('[Meal Planner] Loading data from backend...');
 
-async function showDeleteConfirmation(ids) {
-  const count = ids.length;
-  const message = count === 1
-    ? "Are you sure you want to delete this meal?"
-    : `Are you sure you want to delete ${count} meals?`;
+      const response = await this.hass.callWS({
+        type: 'meal_planner/get'
+      });
 
-  const confirmMsg = document.getElementById("confirm-message");
-  if (confirmMsg) confirmMsg.textContent = message;
-
-  const modal = document.getElementById("modal-confirm");
-  if (modal) modal.classList.remove("hidden");
-
-  // Wait for user response
-  return new Promise((resolve) => {
-    const yesBtn = document.getElementById("confirm-yes");
-    const noBtn = document.getElementById("confirm-no");
-
-    const cleanup = () => {
-      if (modal) modal.classList.add("hidden");
-      yesBtn?.removeEventListener("click", handleYes);
-      noBtn?.removeEventListener("click", handleNo);
-    };
-
-    const handleYes = async () => {
-      cleanup();
-      try {
-        await haWS({ type: "meal_planner/bulk", action: "delete", ids });
-        await loadMeals();
-        // Reset bulk UI
-        if ($("#bulkAction")) $("#bulkAction").value = "";
-      } catch (err) {
-        console.error("Delete failed", err);
-        alert("Delete failed: " + ((err && (err.message || err.code || err.error)) || String(err)));
+      if (response) {
+        this.data = response;
+        console.log('[Meal Planner] Data loaded:', this.data);
       }
-      resolve();
-    };
-
-    const handleNo = () => {
-      cleanup();
-      resolve();
-    };
-
-    yesBtn?.addEventListener("click", handleYes);
-    noBtn?.addEventListener("click", handleNo);
-  });
-}
-
-function updateBulkUI() {
-  const action = document.getElementById("bulkAction")?.value || "";
-  const anySelected = !!document.querySelector(".row-select:checked");
-  const needsDate = (action === "assign_date");
-  const hasDate = !!document.getElementById("bulkDate")?.value;
-
-  // Ensure date/time pickers visibility matches the action
-  if (needsDate) {
-    document.getElementById("bulkDate")?.classList.remove("hidden");
-    document.getElementById("bulkTime")?.classList.remove("hidden");
-  } else {
-    document.getElementById("bulkDate")?.classList.add("hidden");
-    document.getElementById("bulkTime")?.classList.add("hidden");
-  }
-
-  const apply = document.getElementById("btn-apply");
-  if (apply) apply.disabled = !action || !anySelected || (needsDate && !hasDate);
-}
-
-// =====================
-// UI wiring
-// =====================
-function updateFilterVisibility() {
-  const filterType = (document.getElementById("filterType")?.value || "none");
-  const weekPicker = document.getElementById("weekPicker");
-  const monthPicker = document.getElementById("monthPicker");
-  if (weekPicker && monthPicker) {
-    if (filterType === "week") {
-      weekPicker.classList.remove("hidden");
-      monthPicker.classList.add("hidden");
-    } else if (filterType === "month") {
-      monthPicker.classList.remove("hidden");
-      weekPicker.classList.add("hidden");
-    } else {
-      weekPicker.classList.add("hidden");
-      monthPicker.classList.add("hidden");
+    } catch (error) {
+      console.error('[Meal Planner] Failed to load data:', error);
     }
   }
-}
 
-function wireUI() {
-  // Add / Cancel / Save / Settings
-  $("#btn-add")?.addEventListener("click", openAddModal);
-  $("#btn-settings")?.addEventListener("click", () => alert("Settings coming soon"));
-  document.getElementById("cancel")?.addEventListener("click", () => { currentEditId = null; closeAddModal(); });
-  const saveBtn = $("#save");
-  if (saveBtn && !saveBtn.onclick) saveBtn.addEventListener("click", saveMeal);
-
-  // Hide past & filters
-  $("#hidePast")?.addEventListener("change", renderTable);
-  $("#filterType")?.addEventListener("change", () => {
-    updateFilterVisibility();
-    renderTable();
-  });
-  $("#weekPicker")?.addEventListener("change", renderTable);
-  $("#monthPicker")?.addEventListener("change", renderTable);
-  $("#btn-showall")?.addEventListener("click", () => {
-    if ($("#filterType")) $("#filterType").value = "none";
-    updateFilterVisibility();
-    renderTable();
-  });
-
-  // Bulk UI
-  $("#bulkAction")?.addEventListener("change", (e) => {
-    const v = e.target.value;
-    if (v === "assign_date") {
-      $("#bulkDate")?.classList.remove("hidden");
-      $("#bulkTime")?.classList.remove("hidden");
-    } else {
-      $("#bulkDate")?.classList.add("hidden");
-      $("#bulkTime")?.classList.add("hidden");
+  async saveData() {
+    if (!this.hass) {
+      console.warn('[Meal Planner] No HASS connection - cannot save');
+      return false;
     }
-  });
-  // Bulk UI helpers
-  $("#bulkAction")?.addEventListener("change", updateBulkUI);
-  $("#bulkDate")?.addEventListener("input", updateBulkUI);
-  $("#selectAll")?.addEventListener("change", updateBulkUI);
-  $("#btn-apply")?.addEventListener("click", applyBulk);
 
-  // Select all
-  $("#selectAll")?.addEventListener("change", (e) => {
-    const on = e.target.checked;
-    document.querySelectorAll(".row-select").forEach((cb) => (cb.checked = on));
-    updateBulkUI();
-  });
+    try {
+      console.log('[Meal Planner] Saving data to backend...');
 
-  // Event delegation for row checkboxes (prevents memory leak)
-  const tbody = document.querySelector("#allTable tbody");
-  if (tbody) {
-    tbody.addEventListener("change", (e) => {
-      if (e.target.classList.contains("row-select")) {
-        updateBulkUI();
+      await this.hass.callWS({
+        type: 'meal_planner/bulk',
+        data: this.data
+      });
+
+      console.log('[Meal Planner] Data saved successfully');
+      return true;
+    } catch (error) {
+      console.error('[Meal Planner] Failed to save data:', error);
+      return false;
+    }
+  }
+
+  async addMeal(meal) {
+    if (!this.hass) {
+      console.warn('[Meal Planner] No HASS connection - cannot add meal');
+      return false;
+    }
+
+    try {
+      console.log('[Meal Planner] Adding meal:', meal);
+
+      await this.hass.callWS({
+        type: 'meal_planner/add',
+        ...meal
+      });
+
+      // Reload data
+      await this.loadData();
+      this.renderCurrentView();
+
+      console.log('[Meal Planner] Meal added successfully');
+      return true;
+    } catch (error) {
+      console.error('[Meal Planner] Failed to add meal:', error);
+      return false;
+    }
+  }
+
+  async updateMeal(oldMeal, newMeal) {
+    if (!this.hass) {
+      console.warn('[Meal Planner] No HASS connection - cannot update meal');
+      return false;
+    }
+
+    try {
+      console.log('[Meal Planner] Updating meal:', { oldMeal, newMeal });
+
+      await this.hass.callWS({
+        type: 'meal_planner/update',
+        old_name: oldMeal.name,
+        old_date: oldMeal.date || '',
+        ...newMeal
+      });
+
+      // Reload data
+      await this.loadData();
+      this.renderCurrentView();
+
+      console.log('[Meal Planner] Meal updated successfully');
+      return true;
+    } catch (error) {
+      console.error('[Meal Planner] Failed to update meal:', error);
+      return false;
+    }
+  }
+
+  setupEventListeners() {
+    // Navigation tabs
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        e.preventDefault();
+        const view = tab.getAttribute('data-view');
+        this.switchView(view);
+      });
+    });
+
+    // Add meal buttons
+    const addMealBtn = document.getElementById('add-meal-btn');
+    if (addMealBtn) {
+      addMealBtn.addEventListener('click', () => this.openMealModal());
+    }
+
+    const addPotentialBtn = document.getElementById('add-potential-btn');
+    if (addPotentialBtn) {
+      addPotentialBtn.addEventListener('click', () => this.openMealModal(true));
+    }
+
+    // Modal controls
+    const modal = document.getElementById('meal-modal');
+    const modalClose = modal.querySelector('.modal-close');
+    const modalCancel = modal.querySelector('.modal-cancel');
+    const modalOverlay = modal.querySelector('.modal-overlay');
+
+    [modalClose, modalCancel, modalOverlay].forEach(el => {
+      el.addEventListener('click', () => this.closeMealModal());
+    });
+
+    // Form submission
+    const form = document.getElementById('meal-form');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.handleFormSubmit();
+    });
+
+    // Search
+    const searchInput = document.getElementById('search-meals');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        this.searchQuery = e.target.value.toLowerCase();
+        this.renderMealsLibrary();
+      });
+    }
+
+    // Event delegation for dynamic content
+    document.getElementById('views').addEventListener('click', (e) => {
+      const target = e.target;
+
+      // Edit meal
+      if (target.classList.contains('edit-meal-btn') || target.closest('.edit-meal-btn')) {
+        const btn = target.classList.contains('edit-meal-btn') ? target : target.closest('.edit-meal-btn');
+        const mealData = JSON.parse(btn.getAttribute('data-meal'));
+        this.openMealModal(false, mealData);
+      }
+
+      // Delete meal
+      if (target.classList.contains('delete-meal-btn') || target.closest('.delete-meal-btn')) {
+        const btn = target.classList.contains('delete-meal-btn') ? target : target.closest('.delete-meal-btn');
+        const mealData = JSON.parse(btn.getAttribute('data-meal'));
+        this.deleteMeal(mealData);
       }
     });
   }
-}
 
-// Click pencil to edit a single row
-document.addEventListener("click", (e) => {
-  const btn = e.target.closest(".icon-edit");
-  if (!btn) return;
-  const id = btn.getAttribute("data-id");
-  const row = (allData?.rows || []).find(r => r.id === id);
-  if (!row) return;
+  switchView(viewName) {
+    console.log('[Meal Planner] Switching to view:', viewName);
 
-  currentEditId = id;
-  $("#meal-name").value = row.name || "";
-  $("#meal-date").value = row.date || "";
-  $("#meal-time").value = row.meal_time || "Dinner";
-  $("#meal-recipe").value = row.recipe_url || "";
-  $("#meal-notes").value = row.notes || "";
+    this.currentView = viewName;
 
-  openAddModal();
-});
+    // Update tabs
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+      if (tab.getAttribute('data-view') === viewName) {
+        tab.classList.add('active');
+      } else {
+        tab.classList.remove('active');
+      }
+    });
 
-// Open recipe links from buttons
-document.addEventListener("click", (e) => {
-  const btn = e.target.closest(".linkbtn");
-  if (!btn) return;
-  const href = btn.getAttribute("data-href");
-  if (href) window.open(href, "_blank", "noopener,noreferrer");
-});
+    // Update views
+    document.querySelectorAll('.view').forEach(view => {
+      view.classList.remove('active');
+    });
 
-
-// =====================
-// Event subscription (live refresh)
-// =====================
-async function subscribeToUpdates() {
-  try {
-    const hc = await window.parent.hassConnection;
-    const conn = hc.conn ?? hc;
-    conn.subscribeEvents(() => loadMeals(), "meal_planner_updated");
-  } catch (_) { /* not in HA shell */ }
-}
-
-
-// =====================
-// Boot
-// =====================
-window.addEventListener("DOMContentLoaded", async () => {
-  wireUI();
-  updateFilterVisibility();
-  await loadMeals();
-  subscribeToUpdates();
-
-  // Handle refresh properly in iframe context
-  window.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "r") {
-      e.preventDefault();
-      console.log("Refresh requested - reloading data...");
-      loadMeals();
+    const activeView = document.getElementById(`${viewName}-view`);
+    if (activeView) {
+      activeView.classList.add('active');
     }
+
+    // Render view content
+    this.renderCurrentView();
+  }
+
+  renderCurrentView() {
+    switch (this.currentView) {
+      case 'dashboard':
+        this.renderDashboard();
+        break;
+      case 'meals':
+        this.renderMealsLibrary();
+        break;
+      case 'potential':
+        this.renderPotentialMeals();
+        break;
+    }
+  }
+
+  renderDashboard() {
+    const content = document.getElementById('dashboard-content');
+    const scheduled = this.data.scheduled || {};
+    const scheduledMeals = [];
+
+    // Collect all scheduled meals
+    for (const [date, meals] of Object.entries(scheduled)) {
+      for (const [mealTime, name] of Object.entries(meals)) {
+        if (name && name.trim()) {
+          scheduledMeals.push({
+            date,
+            mealTime,
+            name
+          });
+        }
+      }
+    }
+
+    // Sort by date (newest first)
+    scheduledMeals.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    if (scheduledMeals.length === 0) {
+      content.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">📅</div>
+          <div class="empty-text">No scheduled meals yet</div>
+          <div class="empty-hint">Click "Add Meal" to schedule your first meal</div>
+        </div>
+      `;
+      return;
+    }
+
+    let html = '<div class="table-container"><table>';
+    html += '<thead><tr>';
+    html += '<th>Date</th>';
+    html += '<th>Meal Time</th>';
+    html += '<th>Meal Name</th>';
+    html += '<th>Actions</th>';
+    html += '</tr></thead>';
+    html += '<tbody>';
+
+    scheduledMeals.forEach(meal => {
+      const mealData = JSON.stringify({ name: meal.name, date: meal.date });
+      html += '<tr>';
+      html += `<td>${this.formatDate(meal.date)}</td>`;
+      html += `<td><span class="badge badge-secondary">${this.capitalize(meal.mealTime)}</span></td>`;
+      html += `<td>${this.escapeHtml(meal.name)}</td>`;
+      html += `<td>
+        <button class="edit-meal-btn btn-secondary" data-meal='${this.escapeHtml(mealData)}'>Edit</button>
+        <button class="delete-meal-btn btn-secondary" data-meal='${this.escapeHtml(mealData)}'>Delete</button>
+      </td>`;
+      html += '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+    content.innerHTML = html;
+  }
+
+  renderMealsLibrary() {
+    const content = document.getElementById('meals-content');
+    const library = this.data.library || [];
+
+    // Filter by search query
+    let filteredMeals = library;
+    if (this.searchQuery) {
+      filteredMeals = library.filter(meal =>
+        meal.toLowerCase().includes(this.searchQuery)
+      );
+    }
+
+    if (filteredMeals.length === 0) {
+      const message = this.searchQuery
+        ? `No meals found matching "${this.escapeHtml(this.searchQuery)}"`
+        : 'No meals in library yet';
+
+      content.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">📚</div>
+          <div class="empty-text">${message}</div>
+          <div class="empty-hint">Add meals with or without dates to build your library</div>
+        </div>
+      `;
+      return;
+    }
+
+    let html = '<div class="cards-grid">';
+
+    filteredMeals.forEach(meal => {
+      const mealData = JSON.stringify({ name: meal, date: '' });
+      html += `
+        <div class="meal-card">
+          <div class="meal-card-header">
+            <div class="meal-card-title">${this.escapeHtml(meal)}</div>
+          </div>
+          <div class="meal-card-actions">
+            <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}'>Schedule</button>
+          </div>
+        </div>
+      `;
+    });
+
+    html += '</div>';
+    content.innerHTML = html;
+  }
+
+  renderPotentialMeals() {
+    const content = document.getElementById('potential-content');
+    const scheduled = this.data.scheduled || {};
+    const library = this.data.library || [];
+
+    // Find potential meals (in library but not scheduled)
+    const scheduledNames = new Set();
+    for (const meals of Object.values(scheduled)) {
+      for (const name of Object.values(meals)) {
+        if (name && name.trim()) {
+          scheduledNames.add(name.trim().toLowerCase());
+        }
+      }
+    }
+
+    const potentialMeals = library.filter(meal =>
+      !scheduledNames.has(meal.toLowerCase())
+    );
+
+    if (potentialMeals.length === 0) {
+      content.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">💡</div>
+          <div class="empty-text">No potential meals</div>
+          <div class="empty-hint">All your library meals are scheduled, or add new meal ideas</div>
+        </div>
+      `;
+      return;
+    }
+
+    let html = '<div class="cards-grid">';
+
+    potentialMeals.forEach((meal, index) => {
+      const mealData = JSON.stringify({ name: meal, date: '' });
+      html += `
+        <div class="meal-card">
+          <div class="meal-card-header">
+            <span class="badge badge-primary">${index + 1}</span>
+            <div class="meal-card-title">${this.escapeHtml(meal)}</div>
+          </div>
+          <div class="meal-card-actions">
+            <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}'>Schedule</button>
+          </div>
+        </div>
+      `;
+    });
+
+    html += '</div>';
+    content.innerHTML = html;
+  }
+
+  openMealModal(isPotential = false, mealData = null) {
+    const modal = document.getElementById('meal-modal');
+    const form = document.getElementById('meal-form');
+    const title = document.getElementById('modal-title');
+
+    // Reset form
+    form.reset();
+    this.editingMeal = mealData;
+
+    if (mealData) {
+      // Edit mode
+      title.textContent = 'Edit Meal';
+      document.getElementById('meal-name').value = mealData.name || '';
+      document.getElementById('meal-date').value = mealData.date || '';
+      document.getElementById('meal-time').value = mealData.mealTime || 'Dinner';
+      document.getElementById('meal-recipe').value = mealData.recipe || '';
+      document.getElementById('meal-notes').value = mealData.notes || '';
+    } else {
+      // Add mode
+      title.textContent = isPotential ? 'Add Potential Meal' : 'Add Meal';
+      if (isPotential) {
+        document.getElementById('meal-date').value = '';
+      } else {
+        // Set default date to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('meal-date').value = today;
+      }
+    }
+
+    // Populate meal suggestions from library
+    const datalist = document.getElementById('meal-suggestions');
+    datalist.innerHTML = '';
+    (this.data.library || []).forEach(meal => {
+      const option = document.createElement('option');
+      option.value = meal;
+      datalist.appendChild(option);
+    });
+
+    modal.classList.remove('hidden');
+  }
+
+  closeMealModal() {
+    const modal = document.getElementById('meal-modal');
+    modal.classList.add('hidden');
+    this.editingMeal = null;
+  }
+
+  async handleFormSubmit() {
+    const name = document.getElementById('meal-name').value.trim();
+    const date = document.getElementById('meal-date').value;
+    const mealTime = document.getElementById('meal-time').value;
+    const recipe = document.getElementById('meal-recipe').value.trim();
+    const notes = document.getElementById('meal-notes').value.trim();
+
+    if (!name) {
+      alert('Please enter a meal name');
+      return;
+    }
+
+    const newMeal = {
+      name,
+      date: date || '',
+      meal_time: mealTime.toLowerCase(),
+      recipe: recipe || '',
+      notes: notes || ''
+    };
+
+    let success = false;
+
+    if (this.editingMeal) {
+      // Update existing meal
+      success = await this.updateMeal(this.editingMeal, newMeal);
+    } else {
+      // Add new meal
+      success = await this.addMeal(newMeal);
+    }
+
+    if (success) {
+      this.closeMealModal();
+    } else {
+      alert('Failed to save meal. Please try again.');
+    }
+  }
+
+  async deleteMeal(meal) {
+    if (!confirm(`Delete "${meal.name}"?`)) {
+      return;
+    }
+
+    // Remove from scheduled
+    if (meal.date && this.data.scheduled[meal.date]) {
+      for (const [mealTime, name] of Object.entries(this.data.scheduled[meal.date])) {
+        if (name === meal.name) {
+          delete this.data.scheduled[meal.date][mealTime];
+        }
+      }
+
+      // Clean up empty date entries
+      if (Object.keys(this.data.scheduled[meal.date]).length === 0) {
+        delete this.data.scheduled[meal.date];
+      }
+    }
+
+    // Save and re-render
+    const success = await this.saveData();
+    if (success) {
+      await this.loadData();
+      this.renderCurrentView();
+    } else {
+      alert('Failed to delete meal. Please try again.');
+    }
+  }
+
+  // Utility functions
+  formatDate(dateStr) {
+    const date = new Date(dateStr + 'T00:00:00');
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  }
+
+  capitalize(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+}
+
+// Initialize app when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    window.mealPlannerApp = new MealPlannerApp();
   });
-});
+} else {
+  window.mealPlannerApp = new MealPlannerApp();
+}

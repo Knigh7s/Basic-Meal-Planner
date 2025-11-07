@@ -1,151 +1,119 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Meal Planner</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="./style.css">
-
-  <!-- Refresh guard: if loaded top-level, bounce back to HA panel route -->
-  <script>
-  (function () {
-    try {
-      if (!window.parent || window.parent === window) {
-        location.replace("/meal-planner");
-      }
-    } catch (_) {
-      location.replace("/meal-planner");
-    }
-  })();
-  </script>
-
-  <style>
-    /* light, additive polish without touching your existing CSS */
-    .mp-header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
-    .mp-actions{display:flex;align-items:center;gap:.5rem}
-    .icon-btn{padding:.45rem .6rem;border-radius:.5rem;border:1px solid var(--divider-color,#3a3a3a);background:var(--ha-card-background,#1f1f1f);cursor:pointer}
-    .primary{padding:.5rem .9rem;border-radius:.6rem;border:0;background:var(--primary-color,#03a9f4);color:#fff;font-weight:600;cursor:pointer}
-    .mp-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem 1rem;margin:.75rem 0 1rem}
-    .filter-group,.bulk-group{display:flex;align-items:center;gap:.5rem}
-    .hidden{display:none}
-    #allTable th,#allTable td{vertical-align:middle}
-    #allTable .narrow{width:32px;text-align:center}
-    .linkbtn{padding:.35rem .65rem;border-radius:.45rem;border:1px solid var(--divider-color,#3a3a3a);background:var(--ha-card-background,#1f1f1f);cursor:pointer}
-  </style>
 </head>
-
 <body>
   <div id="app">
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <a href="#dashboard" class="nav-tab active" data-view="dashboard">
+        <span class="tab-icon">📅</span>
+        <span class="tab-label">Dashboard</span>
+      </a>
+      <a href="#meals" class="nav-tab" data-view="meals">
+        <span class="tab-icon">📚</span>
+        <span class="tab-label">Meals Library</span>
+      </a>
+      <a href="#potential" class="nav-tab" data-view="potential">
+        <span class="tab-icon">💡</span>
+        <span class="tab-label">Potential Meals</span>
+      </a>
+    </nav>
 
-    <!-- Header: title on left, Settings + Add Meal on right -->
-    <header class="mp-header">
-      <h1>🍽️ Meal Planner</h1>
-      <div class="mp-actions">
-        <button id="btn-add" class="primary">+ Add Meal</button>
-        <button id="btn-settings" class="icon-btn" title="Settings">⚙️</button>
+    <!-- Views Container -->
+    <div id="views">
+      <!-- Dashboard View -->
+      <div id="dashboard-view" class="view active">
+        <div class="view-header">
+          <h1>Scheduled Meals</h1>
+          <button id="add-meal-btn" class="btn-primary">+ Add Meal</button>
+        </div>
+        <div class="view-content">
+          <div id="dashboard-content"></div>
+        </div>
       </div>
-    </header>
 
-    <!-- Compact toolbar: same IDs, cleaner layout -->
-    <div class="mp-toolbar">
-      <label class="chk">
-        <input id="hidePast" type="checkbox" checked>
-        Hide past week
-      </label>
-
-      <div class="filter-group">
-        <label>Filter
-          <select id="filterType">
-            <option value="none">None</option>
-            <option value="week">Week</option>
-            <option value="month">Month</option>
-          </select>
-        </label>
-        <input id="weekPicker" type="week" class="hidden">
-        <input id="monthPicker" type="month" class="hidden">
-        <button id="btn-showall">Show All</button>
+      <!-- Meals Library View -->
+      <div id="meals-view" class="view">
+        <div class="view-header">
+          <h1>Meals Library</h1>
+          <div class="search-box">
+            <input type="search" id="search-meals" placeholder="Search meals...">
+          </div>
+        </div>
+        <div class="view-content">
+          <div id="meals-content"></div>
+        </div>
       </div>
 
-      <div class="bulk-group">
-        <select id="bulkAction">
-          <option value="">Bulk Actions…</option>
-          <option value="convert_to_potential">Convert to Potential (clear date)</option>
-          <option value="assign_date">Assign date…</option>
-          <option value="delete">Delete</option>
-        </select>
-        <input id="bulkDate" type="date" class="hidden">
-        <select id="bulkTime" class="hidden">
-          <option>Breakfast</option>
-          <option>Lunch</option>
-          <option selected>Dinner</option>
-          <option>Snack</option>
-        </select>
-        <button id="btn-apply" disabled>Apply</button>
-      </div>
-    </div>
-
-    <section>
-      <h2>All Meals</h2>
-      <table id="allTable">
-        <thead>
-          <tr>
-            <th class="narrow"><input type="checkbox" id="selectAll"></th>
-            <th>Name</th>
-            <th>Meal</th>
-            <th>Date</th>
-            <th>Recipe</th>
-            <th>Notes</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </section>
-
-    <!-- Modal: Add Meal (unchanged IDs) -->
-    <div id="modal" class="modal hidden">
-      <div class="modal-card">
-        <h3>Add Meal</h3>
-        <label>Name
-          <input id="meal-name" list="meal_options" type="text" placeholder="e.g., Chicken Alfredo">
-          <datalist id="meal_options"></datalist>
-        </label>
-        <label>Date <input id="meal-date" type="date"></label>
-        <label>Meal Time
-          <select id="meal-time">
-            <option>Breakfast</option>
-            <option>Lunch</option>
-            <option selected>Dinner</option>
-            <option>Snack</option>
-          </select>
-        </label>
-        <label>Recipe link (optional)
-          <input id="meal-recipe" type="url" placeholder="https://...">
-        </label>
-        <label>Notes (optional)
-          <textarea id="meal-notes" rows="3" placeholder="Any details to remember"></textarea>
-        </label>
-        <div class="modal-actions">
-          <button id="save">Save</button>
-          <button id="cancel">Cancel</button>
+      <!-- Potential Meals View -->
+      <div id="potential-view" class="view">
+        <div class="view-header">
+          <h1>Potential Meals</h1>
+          <button id="add-potential-btn" class="btn-primary">+ Add Idea</button>
+        </div>
+        <div class="view-content">
+          <div id="potential-content"></div>
         </div>
       </div>
     </div>
-
-    <!-- Modal: Delete Confirmation -->
-    <div id="modal-confirm" class="modal hidden">
-      <div class="modal-card">
-        <h3>Confirm Delete</h3>
-        <p id="confirm-message">Are you sure you want to delete the selected meal(s)?</p>
-        <div class="modal-actions">
-          <button id="confirm-yes" class="danger">Delete</button>
-          <button id="confirm-no">Cancel</button>
-        </div>
-      </div>
-    </div>
-
   </div>
 
-  <!-- Main application logic -->
+  <!-- Add/Edit Meal Modal -->
+  <div id="meal-modal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-title">Add Meal</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="meal-form">
+          <div class="form-group">
+            <label for="meal-name">Meal Name *</label>
+            <input type="text" id="meal-name" required maxlength="100" list="meal-suggestions">
+            <datalist id="meal-suggestions"></datalist>
+          </div>
+
+          <div class="form-group">
+            <label for="meal-date">Date</label>
+            <input type="date" id="meal-date">
+            <small>Leave blank for potential meal</small>
+          </div>
+
+          <div class="form-group">
+            <label for="meal-time">Meal Time</label>
+            <select id="meal-time">
+              <option value="Breakfast">Breakfast</option>
+              <option value="Lunch">Lunch</option>
+              <option value="Dinner" selected>Dinner</option>
+              <option value="Snack">Snack</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="meal-recipe">Recipe URL</label>
+            <input type="url" id="meal-recipe" maxlength="2048" placeholder="https://...">
+          </div>
+
+          <div class="form-group">
+            <label for="meal-notes">Notes</label>
+            <textarea id="meal-notes" rows="3" maxlength="500"></textarea>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary modal-cancel">Cancel</button>
+            <button type="submit" class="btn-primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <script src="./app.js"></script>
 </body>
 </html>
