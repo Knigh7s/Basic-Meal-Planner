@@ -567,7 +567,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             )
         ]
     )
-    _LOGGER.info("Meal Planner: custom cards served from %s", cards_dir)
+
+    # Auto-register cards in frontend (no manual resource registration needed!)
+    from homeassistant.components.frontend import add_extra_js_url
+
+    add_extra_js_url(hass, "/meal_planner/meal-planner-weekly-horizontal.js")
+    add_extra_js_url(hass, "/meal_planner/meal-planner-weekly-vertical.js")
+    add_extra_js_url(hass, "/meal_planner/meal-planner-potential-meals.js")
+
+    _LOGGER.info("Meal Planner: custom cards auto-registered and served from %s", cards_dir)
 
     return True
 
