@@ -519,7 +519,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     _LOGGER.info("Meal Planner: static panel served at /meal-planner from %s", panel_dir)
 
-    # ---------- Sidebar (iframe → reliable & simple) ----------
+    # ---------- Sidebar Panel ----------
     panel_id = "meal-planner"
     add_sidebar = entry.options.get("add_sidebar", True)
 
@@ -530,45 +530,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     if add_sidebar:
         try:
-            # Use custom panel with embedded iframe (like other integrations)
-            # This avoids 403 errors on refresh
+            # Use iframe panel (reliable and simple)
             async_register_built_in_panel(
                 hass,
-                component_name="custom",
+                component_name="iframe",
                 sidebar_title="Meal Planner",
                 sidebar_icon="mdi:silverware-fork-knife",
                 frontend_url_path=panel_id,
-                config={
-                    "_panel_custom": {
-                        "name": "meal-planner-panel",
-                        "html": f"""
-                            <style>
-                                iframe {{
-                                    border: 0;
-                                    width: calc(100% - var(--safe-area-inset-right, 0px));
-                                    height: calc(100% - var(--safe-area-inset-top, 0px) - var(--safe-area-inset-bottom, 0px));
-                                    display: block;
-                                    background-color: var(--primary-background-color);
-                                    margin-top: var(--safe-area-inset-top);
-                                    margin-bottom: var(--safe-area-inset-bottom);
-                                    margin-right: var(--safe-area-inset-right);
-                                }}
-                                @media (max-width: 870px) {{
-                                    iframe {{
-                                        width: calc(100% - var(--safe-area-inset-left, 0px) - var(--safe-area-inset-right, 0px));
-                                        margin-left: var(--safe-area-inset-left);
-                                    }}
-                                }}
-                            </style>
-                            <iframe src="/meal-planner/index.html" title="Meal Planner" allowfullscreen></iframe>
-                        """,
-                    }
-                },
+                config={"url": "/meal-planner/index.html"},
                 require_admin=False,
             )
-            _LOGGER.info("Meal Planner: custom panel '%s' registered", panel_id)
+            _LOGGER.info("Meal Planner: iframe panel '%s' registered", panel_id)
         except Exception as e:
-            _LOGGER.error("Meal Planner: failed to register custom panel: %s", e)
+            _LOGGER.error("Meal Planner: failed to register iframe panel: %s", e)
     else:
         _LOGGER.info("Meal Planner: sidebar option disabled; panel not registered")
 
