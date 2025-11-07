@@ -450,7 +450,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     def ws_get(hass, connection, msg):
         connection.send_result(msg["id"], {
             "settings": data.get("settings", {"week_start": "Sunday"}),
-            "scheduled": data.get("scheduled", {}),
+            "scheduled": data.get("scheduled", []),  # Returns list of meal objects
             "library": data.get("library", []),
         })
 

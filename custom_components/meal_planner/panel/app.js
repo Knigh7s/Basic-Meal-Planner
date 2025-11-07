@@ -6,7 +6,7 @@ class MealPlannerApp {
     this.hass = null;
     this.data = {
       settings: { week_start: 'sunday' },
-      scheduled: {},
+      scheduled: [],  // Array of meal objects with {id, name, meal_time, date, recipe_url, notes}
       library: []
     };
     this.currentView = 'dashboard';
@@ -185,18 +185,17 @@ class MealPlannerApp {
     }
   }
 
-  async updateMeal(oldMeal, newMeal) {
+  async updateMeal(mealId, newMeal) {
     if (!this.hass) {
       console.warn('[Meal Planner] No HASS connection - cannot update meal');
       return false;
     }
 
     try {
-      console.log('[Meal Planner] Updating meal:', { oldMeal, newMeal });
+      console.log('[Meal Planner] Updating meal:', { mealId, newMeal });
 
       await this.callService('meal_planner/update', {
-        old_name: oldMeal.name,
-        old_date: oldMeal.date || '',
+        row_id: mealId,
         ...newMeal
       });
 
@@ -323,21 +322,10 @@ class MealPlannerApp {
 
   renderDashboard() {
     const content = document.getElementById('dashboard-content');
-    const scheduled = this.data.scheduled || {};
-    const scheduledMeals = [];
+    const scheduled = this.data.scheduled || [];
 
-    // Collect all scheduled meals
-    for (const [date, meals] of Object.entries(scheduled)) {
-      for (const [mealTime, name] of Object.entries(meals)) {
-        if (name && name.trim()) {
-          scheduledMeals.push({
-            date,
-            mealTime,
-            name
-          });
-        }
-      }
-    }
+    // Filter only meals with dates (not potential)
+    const scheduledMeals = scheduled.filter(m => m.date && m.date.trim());
 
     // Sort by date (newest first)
     scheduledMeals.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -363,10 +351,18 @@ class MealPlannerApp {
     html += '<tbody>';
 
     scheduledMeals.forEach(meal => {
-      const mealData = JSON.stringify({ name: meal.name, date: meal.date });
+      const mealData = JSON.stringify({
+        id: meal.id,
+        name: meal.name,
+        date: meal.date,
+        meal_time: meal.meal_time,
+        recipe_url: meal.recipe_url || '',
+        notes: meal.notes || ''
+      });
+
       html += '<tr>';
       html += `<td>${this.formatDate(meal.date)}</td>`;
-      html += `<td><span class="badge badge-secondary">${this.capitalize(meal.mealTime)}</span></td>`;
+      html += `<td><span class="badge badge-secondary">${this.capitalize(meal.meal_time)}</span></td>`;
       html += `<td>${this.escapeHtml(meal.name)}</td>`;
       html += `<td>
         <button class="edit-meal-btn btn-secondary" data-meal='${this.escapeHtml(mealData)}'>Edit</button>
@@ -428,29 +424,17 @@ class MealPlannerApp {
 
   renderPotentialMeals() {
     const content = document.getElementById('potential-content');
-    const scheduled = this.data.scheduled || {};
-    const library = this.data.library || [];
+    const scheduled = this.data.scheduled || [];
 
-    // Find potential meals (in library but not scheduled)
-    const scheduledNames = new Set();
-    for (const meals of Object.values(scheduled)) {
-      for (const name of Object.values(meals)) {
-        if (name && name.trim()) {
-          scheduledNames.add(name.trim().toLowerCase());
-        }
-      }
-    }
-
-    const potentialMeals = library.filter(meal =>
-      !scheduledNames.has(meal.toLowerCase())
-    );
+    // Filter meals without dates (potential meals)
+    const potentialMeals = scheduled.filter(m => !m.date || !m.date.trim());
 
     if (potentialMeals.length === 0) {
       content.innerHTML = `
         <div class="empty-state">
           <div class="empty-icon">💡</div>
           <div class="empty-text">No potential meals</div>
-          <div class="empty-hint">All your library meals are scheduled, or add new meal ideas</div>
+          <div class="empty-hint">Add meals without dates to track ideas</div>
         </div>
       `;
       return;
@@ -459,15 +443,25 @@ class MealPlannerApp {
     let html = '<div class="cards-grid">';
 
     potentialMeals.forEach((meal, index) => {
-      const mealData = JSON.stringify({ name: meal, date: '' });
+      const mealData = JSON.stringify({
+        id: meal.id,
+        name: meal.name,
+        date: meal.date || '',
+        meal_time: meal.meal_time,
+        recipe_url: meal.recipe_url || '',
+        notes: meal.notes || ''
+      });
+
       html += `
         <div class="meal-card">
           <div class="meal-card-header">
             <span class="badge badge-primary">${index + 1}</span>
-            <div class="meal-card-title">${this.escapeHtml(meal)}</div>
+            <div class="meal-card-title">${this.escapeHtml(meal.name)}</div>
           </div>
+          ${meal.notes ? `<div class="meal-card-notes">${this.escapeHtml(meal.notes)}</div>` : ''}
           <div class="meal-card-actions">
             <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}'>Schedule</button>
+            <button class="delete-meal-btn btn-secondary" data-meal='${this.escapeHtml(mealData)}'>Delete</button>
           </div>
         </div>
       `;
@@ -491,8 +485,8 @@ class MealPlannerApp {
       title.textContent = 'Edit Meal';
       document.getElementById('meal-name').value = mealData.name || '';
       document.getElementById('meal-date').value = mealData.date || '';
-      document.getElementById('meal-time').value = mealData.mealTime || 'Dinner';
-      document.getElementById('meal-recipe').value = mealData.recipe || '';
+      document.getElementById('meal-time').value = this.capitalize(mealData.meal_time || 'Dinner');
+      document.getElementById('meal-recipe').value = mealData.recipe_url || '';
       document.getElementById('meal-notes').value = mealData.notes || '';
     } else {
       // Add mode
@@ -536,22 +530,22 @@ class MealPlannerApp {
       return;
     }
 
-    const newMeal = {
+    const mealData = {
       name,
       date: date || '',
-      meal_time: mealTime.toLowerCase(),
+      meal_time: mealTime,
       recipe_url: recipe || '',
       notes: notes || ''
     };
 
     let success = false;
 
-    if (this.editingMeal) {
+    if (this.editingMeal && this.editingMeal.id) {
       // Update existing meal
-      success = await this.updateMeal(this.editingMeal, newMeal);
+      success = await this.updateMeal(this.editingMeal.id, mealData);
     } else {
       // Add new meal
-      success = await this.addMeal(newMeal);
+      success = await this.addMeal(mealData);
     }
 
     if (success) {
@@ -566,26 +560,30 @@ class MealPlannerApp {
       return;
     }
 
-    // Remove from scheduled
-    if (meal.date && this.data.scheduled[meal.date]) {
-      for (const [mealTime, name] of Object.entries(this.data.scheduled[meal.date])) {
-        if (name === meal.name) {
-          delete this.data.scheduled[meal.date][mealTime];
-        }
-      }
-
-      // Clean up empty date entries
-      if (Object.keys(this.data.scheduled[meal.date]).length === 0) {
-        delete this.data.scheduled[meal.date];
-      }
+    if (!this.hass) {
+      console.warn('[Meal Planner] No HASS connection - cannot delete meal');
+      alert('Failed to delete meal. Please try again.');
+      return;
     }
 
-    // Save and re-render
-    const success = await this.saveData();
-    if (success) {
+    try {
+      console.log('[Meal Planner] Deleting meal:', meal);
+
+      // Use bulk delete service
+      await this.callService('meal_planner/bulk', {
+        action: 'delete',
+        ids: [meal.id],
+        date: '',
+        meal_time: ''
+      });
+
+      // Reload data
       await this.loadData();
       this.renderCurrentView();
-    } else {
+
+      console.log('[Meal Planner] Meal deleted successfully');
+    } catch (error) {
+      console.error('[Meal Planner] Failed to delete meal:', error);
       alert('Failed to delete meal. Please try again.');
     }
   }
