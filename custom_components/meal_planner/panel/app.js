@@ -221,15 +221,10 @@ class MealPlannerApp {
       });
     });
 
-    // Add meal buttons
+    // Add meal button
     const addMealBtn = document.getElementById('add-meal-btn');
     if (addMealBtn) {
       addMealBtn.addEventListener('click', () => this.openMealModal());
-    }
-
-    const addPotentialBtn = document.getElementById('add-potential-btn');
-    if (addPotentialBtn) {
-      addPotentialBtn.addEventListener('click', () => this.openMealModal(true));
     }
 
     // Modal controls
@@ -448,8 +443,8 @@ class MealPlannerApp {
     const content = document.getElementById('potential-content');
     const scheduled = this.data.scheduled || [];
 
-    // Filter meals without dates (potential meals)
-    const potentialMeals = scheduled.filter(m => !m.date || !m.date.trim());
+    // Filter meals marked as potential
+    const potentialMeals = scheduled.filter(m => m.potential === true);
 
     if (potentialMeals.length === 0) {
       content.innerHTML = `
@@ -515,11 +510,13 @@ class MealPlannerApp {
       document.getElementById('meal-time').value = this.capitalize(mealData.meal_time || 'Dinner');
       document.getElementById('meal-recipe').value = mealData.recipe_url || '';
       document.getElementById('meal-notes').value = mealData.notes || '';
+      document.getElementById('meal-potential').checked = mealData.potential || false;
     } else {
       // Add mode
-      title.textContent = isPotential ? 'Add Potential Meal' : 'Add Meal';
+      title.textContent = 'Add Meal';
       // Leave date blank - user chooses if they want to schedule it
       document.getElementById('meal-date').value = '';
+      document.getElementById('meal-potential').checked = false;
     }
 
     modal.classList.remove('hidden');
@@ -537,6 +534,7 @@ class MealPlannerApp {
     const mealTime = document.getElementById('meal-time').value;
     const recipe = document.getElementById('meal-recipe').value.trim();
     const notes = document.getElementById('meal-notes').value.trim();
+    const potential = document.getElementById('meal-potential').checked;
 
     if (!name) {
       alert('Please enter a meal name');
@@ -548,7 +546,8 @@ class MealPlannerApp {
       date: date || '',
       meal_time: mealTime,
       recipe_url: recipe || '',
-      notes: notes || ''
+      notes: notes || '',
+      potential: potential
     };
 
     let success = false;

@@ -260,6 +260,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         m.setdefault("notes", "")
         m.setdefault("meal_time", "Dinner")
         m.setdefault("date", "")
+        m.setdefault("potential", False)
 
     # Save handles
     hass.data.setdefault(DOMAIN, {})
@@ -316,6 +317,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         notes = _sanitize_string(call.data.get("notes", ""), MAX_NOTES_LENGTH, "notes")
 
         _upsert_library(data, name, recipe_url, notes)
+        potential = call.data.get("potential", False)
         data["scheduled"].append({
             "id": uuid.uuid4().hex,
             "name": name,
@@ -323,6 +325,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "date": date_str,
             "recipe_url": recipe_url,
             "notes": notes,
+            "potential": potential,
         })
 
         # Enforce limits
@@ -364,6 +367,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     updated = True
                 if "notes" in call.data:
                     m["notes"] = _sanitize_string(call.data.get("notes", ""), MAX_NOTES_LENGTH, "notes")
+                    updated = True
+                if "potential" in call.data:
+                    m["potential"] = bool(call.data.get("potential", False))
                     updated = True
                 break
 
@@ -454,7 +460,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "library": data.get("library", []),
         })
 
-    @websocket_api.websocket_command({"type": f"{DOMAIN}/add", "name": str, "meal_time": str, "date": str, "recipe_url": str, "notes": str})
+    @websocket_api.websocket_command({"type": f"{DOMAIN}/add", "name": str, "meal_time": str, "date": str, "recipe_url": str, "notes": str, "potential": bool})
     @callback
     def ws_add(hass, connection, msg):
         hass.async_create_task(hass.services.async_call(DOMAIN, "add", {
@@ -463,6 +469,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "date": msg.get("date",""),
             "recipe_url": msg.get("recipe_url",""),
             "notes": msg.get("notes",""),
+            "potential": msg.get("potential", False),
         }))
         connection.send_result(msg["id"], {"queued": True})
 
@@ -475,6 +482,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "date": str,
         "recipe_url": str,
         "notes": str,
+        "potential": bool,
     })
     @callback
     def ws_update(hass, connection, msg):
@@ -484,6 +492,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         for k in ("name", "meal_time", "date", "recipe_url", "notes"):
             if k in msg:
                 payload[k] = msg.get(k, "")
+        if "potential" in msg:
+            payload["potential"] = msg.get("potential", False)
 
         hass.async_create_task(
             hass.services.async_call(DOMAIN, "update", payload)

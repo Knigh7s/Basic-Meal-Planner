@@ -81,7 +81,6 @@
       <div id="potential-view" class="view">
         <div class="view-header">
           <h1>Potential Meals</h1>
-          <button id="add-potential-btn" class="btn-primary">+ Add Idea</button>
         </div>
         <div class="view-content">
           <div id="potential-content"></div>
@@ -129,6 +128,14 @@
           <div class="form-group">
             <label for="meal-notes">Notes</label>
             <textarea id="meal-notes" rows="3" maxlength="500"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="meal-potential">
+              <span>Mark as Potential (idea to track for future)</span>
+            </label>
+            <small>Potential meals appear in the Potential Meals tab</small>
           </div>
 
           <div class="modal-actions">
