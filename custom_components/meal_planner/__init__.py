@@ -530,21 +530,60 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     if add_sidebar:
         try:
-            # NOTE: registrar is synchronous → do NOT 'await'
+            # Use custom panel with embedded iframe (like other integrations)
+            # This avoids 403 errors on refresh
             async_register_built_in_panel(
                 hass,
-                component_name="iframe",
+                component_name="custom",
                 sidebar_title="Meal Planner",
                 sidebar_icon="mdi:silverware-fork-knife",
-                frontend_url_path=panel_id,                  # /meal-planner
-                config={"url": "/meal-planner/index.html"},  # file served above
+                frontend_url_path=panel_id,
+                config={
+                    "_panel_custom": {
+                        "name": "meal-planner-panel",
+                        "html": f"""
+                            <style>
+                                iframe {{
+                                    border: 0;
+                                    width: calc(100% - var(--safe-area-inset-right, 0px));
+                                    height: calc(100% - var(--safe-area-inset-top, 0px) - var(--safe-area-inset-bottom, 0px));
+                                    display: block;
+                                    background-color: var(--primary-background-color);
+                                    margin-top: var(--safe-area-inset-top);
+                                    margin-bottom: var(--safe-area-inset-bottom);
+                                    margin-right: var(--safe-area-inset-right);
+                                }}
+                                @media (max-width: 870px) {{
+                                    iframe {{
+                                        width: calc(100% - var(--safe-area-inset-left, 0px) - var(--safe-area-inset-right, 0px));
+                                        margin-left: var(--safe-area-inset-left);
+                                    }}
+                                }}
+                            </style>
+                            <iframe src="/meal-planner/index.html" title="Meal Planner" allowfullscreen></iframe>
+                        """,
+                    }
+                },
                 require_admin=False,
             )
-            _LOGGER.info("Meal Planner: iframe panel '%s' registered", panel_id)
+            _LOGGER.info("Meal Planner: custom panel '%s' registered", panel_id)
         except Exception as e:
-            _LOGGER.error("Meal Planner: failed to register iframe panel: %s", e)
+            _LOGGER.error("Meal Planner: failed to register custom panel: %s", e)
     else:
         _LOGGER.info("Meal Planner: sidebar option disabled; panel not registered")
+
+    # ---------- Register Custom Lovelace Cards ----------
+    cards_dir = Path(__file__).parent / "www"
+    await hass.http.async_register_static_paths(
+        [
+            StaticPathConfig(
+                url_path="/meal_planner",
+                path=str(cards_dir),
+                cache_headers=False,
+            )
+        ]
+    )
+    _LOGGER.info("Meal Planner: custom cards served from %s", cards_dir)
 
     return True
 
