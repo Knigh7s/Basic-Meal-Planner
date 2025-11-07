@@ -346,6 +346,8 @@ class MealPlannerApp {
     html += '<th>Date</th>';
     html += '<th>Meal Time</th>';
     html += '<th>Meal Name</th>';
+    html += '<th>Recipe URL</th>';
+    html += '<th>Notes</th>';
     html += '<th>Actions</th>';
     html += '</tr></thead>';
     html += '<tbody>';
@@ -364,6 +366,8 @@ class MealPlannerApp {
       html += `<td>${this.formatDate(meal.date)}</td>`;
       html += `<td><span class="badge badge-secondary">${this.capitalize(meal.meal_time)}</span></td>`;
       html += `<td>${this.escapeHtml(meal.name)}</td>`;
+      html += `<td>${meal.recipe_url ? `<a href="${this.escapeHtml(meal.recipe_url)}" target="_blank">View Recipe</a>` : '-'}</td>`;
+      html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td>
         <button class="edit-meal-btn btn-secondary" data-meal='${this.escapeHtml(mealData)}'>Edit</button>
         <button class="delete-meal-btn btn-secondary" data-meal='${this.escapeHtml(mealData)}'>Delete</button>
@@ -403,7 +407,14 @@ class MealPlannerApp {
       return;
     }
 
-    let html = '<div class="cards-grid">';
+    let html = '<div class="table-container"><table>';
+    html += '<thead><tr>';
+    html += '<th>Meal Name</th>';
+    html += '<th>Recipe URL</th>';
+    html += '<th>Notes</th>';
+    html += '<th>Actions</th>';
+    html += '</tr></thead>';
+    html += '<tbody>';
 
     filteredMeals.forEach(meal => {
       // Handle both string and object formats
@@ -419,21 +430,17 @@ class MealPlannerApp {
         notes: notes
       });
 
-      html += `
-        <div class="meal-card">
-          <div class="meal-card-header">
-            <div class="meal-card-title">${this.escapeHtml(mealName)}</div>
-          </div>
-          ${notes ? `<div class="meal-card-notes">${this.escapeHtml(notes)}</div>` : ''}
-          ${recipeUrl ? `<div class="meal-card-meta"><a href="${this.escapeHtml(recipeUrl)}" target="_blank">View Recipe</a></div>` : ''}
-          <div class="meal-card-actions">
-            <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}'>Schedule</button>
-          </div>
-        </div>
-      `;
+      html += '<tr>';
+      html += `<td>${this.escapeHtml(mealName)}</td>`;
+      html += `<td>${recipeUrl ? `<a href="${this.escapeHtml(recipeUrl)}" target="_blank">View Recipe</a>` : '-'}</td>`;
+      html += `<td>${notes ? this.escapeHtml(notes) : '-'}</td>`;
+      html += `<td>
+        <button class="edit-meal-btn btn-secondary" data-meal='${this.escapeHtml(mealData)}'>Schedule</button>
+      </td>`;
+      html += '</tr>';
     });
 
-    html += '</div>';
+    html += '</tbody></table></div>';
     content.innerHTML = html;
   }
 
@@ -455,9 +462,17 @@ class MealPlannerApp {
       return;
     }
 
-    let html = '<div class="cards-grid">';
+    let html = '<div class="table-container"><table>';
+    html += '<thead><tr>';
+    html += '<th>Meal Name</th>';
+    html += '<th>Meal Time</th>';
+    html += '<th>Recipe URL</th>';
+    html += '<th>Notes</th>';
+    html += '<th>Actions</th>';
+    html += '</tr></thead>';
+    html += '<tbody>';
 
-    potentialMeals.forEach((meal, index) => {
+    potentialMeals.forEach(meal => {
       const mealData = JSON.stringify({
         id: meal.id,
         name: meal.name,
@@ -467,22 +482,19 @@ class MealPlannerApp {
         notes: meal.notes || ''
       });
 
-      html += `
-        <div class="meal-card">
-          <div class="meal-card-header">
-            <span class="badge badge-primary">${index + 1}</span>
-            <div class="meal-card-title">${this.escapeHtml(meal.name)}</div>
-          </div>
-          ${meal.notes ? `<div class="meal-card-notes">${this.escapeHtml(meal.notes)}</div>` : ''}
-          <div class="meal-card-actions">
-            <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}'>Schedule</button>
-            <button class="delete-meal-btn btn-secondary" data-meal='${this.escapeHtml(mealData)}'>Delete</button>
-          </div>
-        </div>
-      `;
+      html += '<tr>';
+      html += `<td>${this.escapeHtml(meal.name)}</td>`;
+      html += `<td><span class="badge badge-secondary">${this.capitalize(meal.meal_time)}</span></td>`;
+      html += `<td>${meal.recipe_url ? `<a href="${this.escapeHtml(meal.recipe_url)}" target="_blank">View Recipe</a>` : '-'}</td>`;
+      html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
+      html += `<td>
+        <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}'>Schedule</button>
+        <button class="delete-meal-btn btn-secondary" data-meal='${this.escapeHtml(mealData)}'>Delete</button>
+      </td>`;
+      html += '</tr>';
     });
 
-    html += '</div>';
+    html += '</tbody></table></div>';
     content.innerHTML = html;
   }
 

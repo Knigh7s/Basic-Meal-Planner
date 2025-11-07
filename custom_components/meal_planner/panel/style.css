@@ -310,6 +310,15 @@ tbody tr:last-child td {
   border-bottom: none;
 }
 
+td a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+td a:hover {
+  text-decoration: underline;
+}
+
 /* Modal */
 .modal {
   position: fixed;
