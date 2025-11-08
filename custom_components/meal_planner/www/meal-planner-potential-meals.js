@@ -103,74 +103,133 @@ class MealPlannerPotentialMeals extends HTMLElement {
         justify-content: space-between;
         padding-right: 16px;
       }
+
       .count-badge {
-        background: var(--primary-color);
-        color: var(--text-primary-color);
-        padding: 4px 12px;
-        border-radius: 16px;
-        font-weight: 600;
+        background: linear-gradient(135deg,
+          var(--primary-color, #e91e63) 0%,
+          var(--accent-color, #9c27b0) 100%);
+        color: #fff;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-weight: 700;
         font-size: 0.9em;
-        min-width: 24px;
+        min-width: 28px;
         text-align: center;
+        box-shadow: 0 2px 8px rgba(233, 30, 99, 0.3);
       }
+
       .meal-list {
         list-style: none;
         padding: 0;
         margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
       }
+
       .meal-item {
         display: flex;
         align-items: center;
-        gap: 12px;
-        padding: 10px 0;
-        border-bottom: 1px solid var(--divider-color);
+        gap: 14px;
+        padding: 14px 12px;
+        background: linear-gradient(90deg,
+          rgba(var(--rgb-primary-color, 3, 169, 244), 0.08) 0%,
+          rgba(var(--rgb-primary-color, 3, 169, 244), 0.02) 100%);
+        border-radius: 10px;
+        border-left: 3px solid rgba(var(--rgb-primary-color, 3, 169, 244), 0.3);
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
       }
-      .meal-item:last-child {
-        border-bottom: none;
+
+      .meal-item:hover {
+        background: linear-gradient(90deg,
+          rgba(var(--rgb-primary-color, 3, 169, 244), 0.15) 0%,
+          rgba(var(--rgb-primary-color, 3, 169, 244), 0.05) 100%);
+        border-left-color: rgba(var(--rgb-primary-color, 3, 169, 244), 0.5);
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+        transform: translateX(3px);
       }
+
       .meal-number {
-        background: var(--secondary-background-color);
-        color: var(--secondary-text-color);
-        width: 28px;
-        height: 28px;
+        background: linear-gradient(135deg,
+          rgba(var(--rgb-primary-color, 3, 169, 244), 0.25) 0%,
+          rgba(var(--rgb-primary-color, 3, 169, 244), 0.15) 100%);
+        color: var(--primary-text-color, #fff);
+        width: 34px;
+        height: 34px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-weight: 600;
-        font-size: 0.9em;
+        font-weight: 700;
+        font-size: 0.95em;
         flex-shrink: 0;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
       }
+
       .meal-name {
         flex: 1;
+        font-weight: 500;
+        color: var(--primary-text-color, #fff);
+        line-height: 1.4;
       }
+
       .more-items {
         text-align: center;
-        padding: 12px 0;
-        color: var(--secondary-text-color);
+        padding: 16px 0 8px;
+        color: var(--secondary-text-color, #888);
         font-style: italic;
+        font-size: 0.9em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
       }
+
+      .more-items::before {
+        content: '⬇️';
+        font-size: 1.1em;
+      }
+
       .empty-state {
         text-align: center;
-        padding: 32px 16px;
+        padding: 48px 24px;
+        background: linear-gradient(135deg,
+          rgba(var(--rgb-primary-color, 3, 169, 244), 0.05) 0%,
+          rgba(var(--rgb-accent-color, 156, 39, 176), 0.05) 100%);
+        border-radius: 12px;
+        margin: 8px;
       }
+
       .empty-icon {
-        font-size: 3em;
-        margin-bottom: 12px;
+        font-size: 4em;
+        margin-bottom: 16px;
+        filter: grayscale(0.3);
+        opacity: 0.8;
       }
+
       .empty-text {
-        font-size: 1.1em;
+        font-size: 1.2em;
         font-weight: 600;
-        margin-bottom: 8px;
-        color: var(--primary-text-color);
+        margin-bottom: 10px;
+        color: var(--primary-text-color, #fff);
       }
+
       .empty-hint {
-        color: var(--secondary-text-color);
-        font-size: 0.9em;
+        color: var(--secondary-text-color, #aaa);
+        font-size: 0.95em;
+        line-height: 1.5;
+        max-width: 300px;
+        margin: 0 auto;
       }
+
       .error {
         color: var(--error-color);
         padding: 16px;
+        text-align: center;
+        background: rgba(var(--rgb-error-color, 244, 67, 54), 0.1);
+        border-radius: 8px;
+        margin: 8px;
       }
     `;
   }

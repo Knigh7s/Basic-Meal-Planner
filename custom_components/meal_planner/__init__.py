@@ -150,6 +150,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 # --------------
 
 class PotentialMealsSensor(SensorEntity):
+    _attr_has_entity_name = False
     _attr_name = "Meal Planner Potential"
     _attr_icon = "mdi:lightbulb-outline"
     _attr_should_poll = False
@@ -158,9 +159,10 @@ class PotentialMealsSensor(SensorEntity):
         self.hass = hass
         self.store = store
         self.data = data
-        self.entity_id = "sensor.meal_planner_potential"
         # unique per config entry to avoid collisions
         self._attr_unique_id = f"{entry_id}_meal_planner_potential"
+        # This ensures the entity_id is exactly sensor.meal_planner_potential
+        self._attr_suggested_object_id = "meal_planner_potential"
         self._recalc()
 
     def _recalc(self) -> None:
@@ -182,6 +184,7 @@ class PotentialMealsSensor(SensorEntity):
 
 
 class WeeklyMealsSensor(SensorEntity):
+    _attr_has_entity_name = False
     _attr_name = "Meal Planner Week"
     _attr_icon = "mdi:calendar-week"
     _attr_should_poll = False
@@ -190,8 +193,9 @@ class WeeklyMealsSensor(SensorEntity):
         self.hass = hass
         self.store = store
         self.data = data
-        self.entity_id = "sensor.meal_planner_week"
         self._attr_unique_id = f"{entry_id}_meal_planner_week"
+        # This ensures the entity_id is exactly sensor.meal_planner_week
+        self._attr_suggested_object_id = "meal_planner_week"
         self._recalc()
 
     def _recalc(self) -> None:

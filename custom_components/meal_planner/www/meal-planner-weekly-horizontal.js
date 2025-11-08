@@ -55,30 +55,49 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
       mealTimes.push('snack');
     }
 
+    // Get today's day code
+    const today = new Date();
+    const todayCode = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][today.getDay()];
+
     // Build table
-    let html = '<table class="meal-grid"><thead><tr><th></th>';
+    let html = '<table class="meal-grid"><thead><tr><th class="corner-cell"></th>';
 
     // Header row (days)
     dayOrder.forEach(day => {
-      const label = days[day]?.label || day.toUpperCase();
-      html += `<th>${label}</th>`;
+      const dayData = days[day] || {};
+      const label = dayData.label || day.toUpperCase();
+      const isToday = day === todayCode;
+
+      // Get day name and date number
+      const dayParts = label.split(' ');
+      const dayName = dayParts[0];
+      const dateNum = dayParts.length > 1 ? dayParts[1] : '';
+
+      html += `<th class="day-header ${isToday ? 'today' : ''}">`;
+      html += `<div class="day-name">${dayName}</div>`;
+      if (dateNum) {
+        html += `<div class="date-num">${dateNum}</div>`;
+      }
+      html += `</th>`;
     });
     html += '</tr></thead><tbody>';
 
     // Meal time rows
     mealTimes.forEach(mealTime => {
-      html += `<tr><th class="meal-time">${this.capitalize(mealTime)}</th>`;
+      const icon = this.getMealIcon(mealTime);
+      html += `<tr><th class="meal-time"><span class="meal-icon">${icon}</span>${this.capitalize(mealTime)}</th>`;
 
       dayOrder.forEach(day => {
         const meal = days[day]?.[mealTime] || '';
         const isEmpty = !meal || meal.trim() === '';
+        const isToday = day === todayCode;
 
         if (isEmpty && !this.config.show_empty) {
-          html += '<td class="empty"></td>';
+          html += `<td class="empty ${isToday ? 'today' : ''}"></td>`;
         } else if (isEmpty) {
-          html += '<td class="empty">—</td>';
+          html += `<td class="empty ${isToday ? 'today' : ''}">—</td>`;
         } else {
-          html += `<td class="meal">${this.escapeHtml(meal)}</td>`;
+          html += `<td class="meal ${isToday ? 'today' : ''}">${this.escapeHtml(meal)}</td>`;
         }
       });
 
@@ -87,6 +106,16 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
 
     html += '</tbody></table>';
     this.content.innerHTML = html;
+  }
+
+  getMealIcon(mealTime) {
+    const icons = {
+      breakfast: '🍳',
+      lunch: '🥗',
+      dinner: '🍽️',
+      snack: '🍿'
+    };
+    return icons[mealTime] || '🍴';
   }
 
   capitalize(str) {
@@ -105,36 +134,173 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
 
   static get styles() {
     return `
+      .card-content {
+        padding: 0;
+        overflow-x: auto;
+      }
+
       .meal-grid {
         width: 100%;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
         table-layout: fixed;
       }
-      .meal-grid th, .meal-grid td {
-        padding: 8px;
+
+      .meal-grid th,
+      .meal-grid td {
+        padding: 12px 10px;
         text-align: center;
-        border: 1px solid var(--divider-color);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        transition: all 0.2s ease;
       }
-      .meal-grid thead th {
-        background: var(--primary-color);
-        color: var(--text-primary-color);
+
+      /* Corner cell */
+      .meal-grid .corner-cell {
+        background: transparent;
+        border: none;
+        width: 80px;
+      }
+
+      /* Day headers */
+      .meal-grid thead th.day-header {
+        background: linear-gradient(180deg,
+          rgba(var(--rgb-primary-color, 3, 169, 244), 0.15) 0%,
+          rgba(var(--rgb-primary-color, 3, 169, 244), 0.05) 100%);
         font-weight: 600;
+        padding: 14px 8px;
+        border-bottom: 2px solid rgba(var(--rgb-primary-color, 3, 169, 244), 0.3);
+        position: relative;
       }
+
+      .meal-grid thead th.day-header.today {
+        background: linear-gradient(180deg,
+          var(--primary-color, #e91e63) 0%,
+          var(--accent-color, #9c27b0) 100%);
+        color: #fff;
+        box-shadow: 0 3px 10px rgba(233, 30, 99, 0.3);
+        border-bottom-color: rgba(255, 255, 255, 0.3);
+      }
+
+      .meal-grid thead th.day-header .day-name {
+        font-size: 0.75em;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+        opacity: 0.9;
+      }
+
+      .meal-grid thead th.day-header.today .day-name {
+        color: rgba(255, 255, 255, 0.95);
+      }
+
+      .meal-grid thead th.day-header .date-num {
+        font-size: 1.4em;
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      .meal-grid thead th.day-header.today .date-num {
+        color: #fff;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      }
+
+      /* Meal time labels */
       .meal-grid tbody th.meal-time {
-        background: var(--secondary-background-color);
-        font-weight: 500;
+        background: linear-gradient(90deg,
+          rgba(var(--rgb-primary-color, 3, 169, 244), 0.12) 0%,
+          rgba(var(--rgb-primary-color, 3, 169, 244), 0.04) 100%);
+        font-weight: 600;
         text-align: left;
+        white-space: nowrap;
+        padding-left: 12px;
+        border-right: 2px solid rgba(var(--rgb-primary-color, 3, 169, 244), 0.2);
+        color: var(--primary-text-color, #fff);
       }
+
+      .meal-grid .meal-icon {
+        font-size: 1.2em;
+        margin-right: 8px;
+        vertical-align: middle;
+      }
+
+      /* Meal cells */
+      .meal-grid td {
+        background: var(--card-background-color, #2b2b2b);
+        font-size: 0.9em;
+        padding: 14px 10px;
+        vertical-align: middle;
+        position: relative;
+      }
+
       .meal-grid td.meal {
-        background: var(--card-background-color);
+        background: rgba(var(--rgb-primary-color, 3, 169, 244), 0.08);
+        font-weight: 500;
+        color: var(--primary-text-color, #fff);
+        cursor: default;
       }
+
+      .meal-grid td.meal:hover {
+        background: rgba(var(--rgb-primary-color, 3, 169, 244), 0.15);
+        box-shadow: inset 0 0 0 1px rgba(var(--rgb-primary-color, 3, 169, 244), 0.3);
+      }
+
+      .meal-grid td.today {
+        background: linear-gradient(180deg,
+          rgba(233, 30, 99, 0.2) 0%,
+          rgba(156, 39, 176, 0.15) 100%);
+        border-left: 2px solid rgba(233, 30, 99, 0.4);
+        border-right: 2px solid rgba(233, 30, 99, 0.4);
+      }
+
+      .meal-grid td.meal.today {
+        background: linear-gradient(180deg,
+          rgba(233, 30, 99, 0.25) 0%,
+          rgba(156, 39, 176, 0.2) 100%);
+        font-weight: 600;
+        color: #fff;
+      }
+
+      .meal-grid td.meal.today:hover {
+        background: linear-gradient(180deg,
+          rgba(233, 30, 99, 0.35) 0%,
+          rgba(156, 39, 176, 0.3) 100%);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+      }
+
       .meal-grid td.empty {
-        background: var(--secondary-background-color);
-        opacity: 0.5;
+        background: rgba(0, 0, 0, 0.15);
+        color: var(--secondary-text-color, #888);
+        opacity: 0.6;
       }
+
+      .meal-grid td.empty.today {
+        background: linear-gradient(180deg,
+          rgba(233, 30, 99, 0.15) 0%,
+          rgba(156, 39, 176, 0.1) 100%);
+        opacity: 0.8;
+      }
+
+      /* First/last cell rounding */
+      .meal-grid thead tr:first-child th:first-child {
+        border-top-left-radius: 8px;
+      }
+
+      .meal-grid thead tr:first-child th:last-child {
+        border-top-right-radius: 8px;
+      }
+
+      .meal-grid tbody tr:last-child th:first-child {
+        border-bottom-left-radius: 8px;
+      }
+
+      .meal-grid tbody tr:last-child td:last-child {
+        border-bottom-right-radius: 8px;
+      }
+
       .error {
         color: var(--error-color);
         padding: 16px;
+        text-align: center;
       }
     `;
   }

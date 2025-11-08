@@ -64,38 +64,50 @@ class MealPlannerWeeklyVertical extends HTMLElement {
     dayOrder.forEach(day => {
       const dayData = days[day] || {};
       const label = dayData.label || day.toUpperCase();
+      const dateStr = dayData.date || '';
       const isToday = day === todayCode;
 
-      // Count meals for this day
-      let mealCount = 0;
-      mealTimes.forEach(mealTime => {
-        if (dayData[mealTime] && dayData[mealTime].trim()) {
-          mealCount++;
-        }
-      });
+      // Get day name and date number
+      const dayParts = label.split(' ');
+      const dayName = dayParts[0]; // e.g., "Mon"
+      const dateNum = dayParts.length > 1 ? dayParts[1] : '';  // e.g., "26"
 
       html += `<div class="day-row ${isToday ? 'today' : ''}">`;
-      html += `<div class="day-header">`;
-      html += `<span class="day-label">${label}</span>`;
-      if (isToday) html += `<span class="today-badge">Today</span>`;
-      html += `<span class="meal-count">${mealCount}/${mealTimes.length}</span>`;
+
+      // Left side - Date
+      html += `<div class="date-col">`;
+      html += `<div class="day-name">${dayName}</div>`;
+      if (dateNum) {
+        html += `<div class="date-num">${dateNum}</div>`;
+      }
       html += `</div>`;
 
+      // Right side - Meals
+      html += `<div class="meals-col">`;
+
       if (!this.config.compact) {
-        html += `<div class="meal-list">`;
+        let hasMeals = false;
         mealTimes.forEach(mealTime => {
           const meal = dayData[mealTime] || '';
           const icon = this.getMealIcon(mealTime);
           if (meal && meal.trim()) {
+            hasMeals = true;
             html += `<div class="meal-item">`;
             html += `<span class="meal-icon">${icon}</span>`;
+            html += `<div class="meal-details">`;
             html += `<span class="meal-name">${this.escapeHtml(meal)}</span>`;
+            html += `<span class="meal-time">${this.capitalize(mealTime)}</span>`;
+            html += `</div>`;
             html += `</div>`;
           }
         });
-        html += `</div>`;
+
+        if (!hasMeals) {
+          html += `<div class="no-meals">No meals planned</div>`;
+        }
       }
 
+      html += `</div>`;
       html += `</div>`;
     });
 
@@ -119,6 +131,10 @@ class MealPlannerWeeklyVertical extends HTMLElement {
     return div.innerHTML;
   }
 
+  capitalize(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
   getCardSize() {
     return this.config.compact ? 3 : 5;
   }
@@ -128,62 +144,146 @@ class MealPlannerWeeklyVertical extends HTMLElement {
       .day-list {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 6px;
+        padding: 4px;
       }
+
       .day-row {
-        border: 1px solid var(--divider-color);
-        border-radius: 8px;
-        padding: 12px;
-        background: var(--card-background-color);
-      }
-      .day-row.today {
-        border-color: var(--primary-color);
-        border-width: 2px;
-        background: var(--primary-background-color);
-      }
-      .day-header {
         display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 8px;
-      }
-      .day-label {
-        font-weight: 600;
-        font-size: 1.1em;
-      }
-      .today-badge {
-        background: var(--primary-color);
-        color: var(--text-primary-color);
-        padding: 2px 8px;
+        align-items: stretch;
         border-radius: 12px;
-        font-size: 0.8em;
-        font-weight: 600;
+        overflow: hidden;
+        background: var(--card-background-color, #2b2b2b);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        transition: all 0.3s ease;
+        min-height: 60px;
       }
-      .meal-count {
-        margin-left: auto;
-        color: var(--secondary-text-color);
-        font-size: 0.9em;
+
+      .day-row:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+        transform: translateY(-2px);
       }
-      .meal-list {
+
+      .day-row.today {
+        background: linear-gradient(135deg,
+          var(--primary-color, #e91e63) 0%,
+          var(--accent-color, #9c27b0) 100%);
+        box-shadow: 0 4px 12px rgba(233, 30, 99, 0.4);
+      }
+
+      .date-col {
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        align-items: center;
+        justify-content: center;
+        min-width: 70px;
+        padding: 12px 16px;
+        background: rgba(0, 0, 0, 0.15);
+        border-right: 2px solid rgba(255, 255, 255, 0.1);
       }
+
+      .day-row.today .date-col {
+        background: rgba(255, 255, 255, 0.2);
+        border-right-color: rgba(255, 255, 255, 0.3);
+      }
+
+      .day-name {
+        font-size: 0.75em;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--secondary-text-color, #aaa);
+        margin-bottom: 2px;
+      }
+
+      .day-row.today .day-name {
+        color: rgba(255, 255, 255, 0.9);
+      }
+
+      .date-num {
+        font-size: 1.8em;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--primary-text-color, #fff);
+      }
+
+      .day-row.today .date-num {
+        color: #fff;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+
+      .meals-col {
+        flex: 1;
+        padding: 10px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        justify-content: center;
+      }
+
       .meal-item {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
+        padding: 6px 0;
+      }
+
+      .meal-icon {
+        font-size: 1.5em;
+        line-height: 1;
+        flex-shrink: 0;
+      }
+
+      .meal-details {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .meal-name {
+        font-size: 0.95em;
+        font-weight: 500;
+        color: var(--primary-text-color, #fff);
+        line-height: 1.3;
+      }
+
+      .day-row.today .meal-name {
+        color: #fff;
+      }
+
+      .meal-time {
+        font-size: 0.75em;
+        color: var(--secondary-text-color, #aaa);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .day-row.today .meal-time {
+        color: rgba(255, 255, 255, 0.8);
+      }
+
+      .meal-time::before {
+        content: '🕐';
+        font-size: 0.9em;
+      }
+
+      .no-meals {
+        font-size: 0.85em;
+        color: var(--secondary-text-color, #666);
+        font-style: italic;
         padding: 4px 0;
       }
-      .meal-icon {
-        font-size: 1.2em;
+
+      .day-row.today .no-meals {
+        color: rgba(255, 255, 255, 0.7);
       }
-      .meal-name {
-        flex: 1;
-      }
+
       .error {
         color: var(--error-color);
         padding: 16px;
+        text-align: center;
       }
     `;
   }
