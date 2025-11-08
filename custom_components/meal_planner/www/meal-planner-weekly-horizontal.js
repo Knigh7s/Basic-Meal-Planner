@@ -3,16 +3,13 @@
 
 class MealPlannerWeeklyHorizontal extends HTMLElement {
   setConfig(config) {
-    if (!config.entity) {
-      throw new Error('You need to define an entity (sensor.meal_planner_week)');
-    }
-
+    // Default to sensor.meal_planner_week if not specified
     this.config = {
-      entity: config.entity,
-      week_start: config.week_start || 'Sunday',
-      show_empty: config.show_empty !== false,
-      show_snacks: config.show_snacks !== false,
-      title: config.title || 'Weekly Meal Plan'
+      entity: (config && config.entity) || 'sensor.meal_planner_week',
+      week_start: (config && config.week_start) || 'Sunday',
+      show_empty: (config && config.show_empty !== false) !== false,
+      show_snacks: (config && config.show_snacks !== false) !== false,
+      title: (config && config.title) || 'Weekly Meal Plan'
     };
 
     if (!this.content) {

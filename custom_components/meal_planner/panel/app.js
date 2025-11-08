@@ -354,7 +354,8 @@ class MealPlannerApp {
         date: meal.date,
         meal_time: meal.meal_time,
         recipe_url: meal.recipe_url || '',
-        notes: meal.notes || ''
+        notes: meal.notes || '',
+        potential: meal.potential || false
       });
 
       html += '<tr>';
@@ -422,7 +423,8 @@ class MealPlannerApp {
         date: '',
         meal_time: 'Dinner',
         recipe_url: recipeUrl,
-        notes: notes
+        notes: notes,
+        potential: false
       });
 
       html += '<tr>';
@@ -474,7 +476,8 @@ class MealPlannerApp {
         date: meal.date || '',
         meal_time: meal.meal_time,
         recipe_url: meal.recipe_url || '',
-        notes: meal.notes || ''
+        notes: meal.notes || '',
+        potential: meal.potential || false
       });
 
       html += '<tr>';

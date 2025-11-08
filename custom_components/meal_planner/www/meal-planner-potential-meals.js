@@ -3,15 +3,12 @@
 
 class MealPlannerPotentialMeals extends HTMLElement {
   setConfig(config) {
-    if (!config.entity) {
-      throw new Error('You need to define an entity (sensor.meal_planner_potential)');
-    }
-
+    // Default to sensor.meal_planner_potential if not specified
     this.config = {
-      entity: config.entity,
-      max_items: config.max_items || 10,
-      show_count: config.show_count !== false,
-      title: config.title || 'Potential Meals'
+      entity: (config && config.entity) || 'sensor.meal_planner_potential',
+      max_items: (config && config.max_items) || 10,
+      show_count: (config && config.show_count !== false) !== false,
+      title: (config && config.title) || 'Potential Meals'
     };
 
     if (!this.content) {
