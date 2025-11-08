@@ -13,6 +13,7 @@ class MealPlannerPotentialMeals extends HTMLElement {
 
     if (!this.content) {
       this.innerHTML = `
+        <style>${this.constructor.styles}</style>
         <ha-card>
           <div class="card-header">
             <div class="name"></div>
