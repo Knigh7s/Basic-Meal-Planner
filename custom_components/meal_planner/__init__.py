@@ -150,7 +150,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 # --------------
 
 class PotentialMealsSensor(SensorEntity):
-    _attr_name = "Meal Planner Potential Meals"
+    _attr_name = "Meal Planner Potential"
     _attr_icon = "mdi:lightbulb-outline"
     _attr_should_poll = False
 
@@ -158,15 +158,17 @@ class PotentialMealsSensor(SensorEntity):
         self.hass = hass
         self.store = store
         self.data = data
+        self.entity_id = "sensor.meal_planner_potential"
         # unique per config entry to avoid collisions
         self._attr_unique_id = f"{entry_id}_meal_planner_potential"
         self._recalc()
 
     def _recalc(self) -> None:
+        # Get meals marked as potential
         items = [
             (m.get("name") or "")
             for m in self.data.get("scheduled", [])
-            if not (m.get("date") or "").strip()
+            if m.get("potential") == True
         ]
         items = [i for i in items if i]
         self._attr_native_value = len(items)
@@ -180,7 +182,7 @@ class PotentialMealsSensor(SensorEntity):
 
 
 class WeeklyMealsSensor(SensorEntity):
-    _attr_name = "Meal Planner Weekly View"
+    _attr_name = "Meal Planner Week"
     _attr_icon = "mdi:calendar-week"
     _attr_should_poll = False
 
@@ -188,6 +190,7 @@ class WeeklyMealsSensor(SensorEntity):
         self.hass = hass
         self.store = store
         self.data = data
+        self.entity_id = "sensor.meal_planner_week"
         self._attr_unique_id = f"{entry_id}_meal_planner_week"
         self._recalc()
 
