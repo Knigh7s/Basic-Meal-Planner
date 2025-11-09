@@ -42,9 +42,24 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
   updateCard(entity) {
     const days = entity.attributes.days || {};
     const weekStart = entity.attributes.week_start || this.config.week_start;
-    const dateRange = entity.state || '';
+    const startDate = entity.attributes.start || '';
+    const endDate = entity.attributes.end || '';
 
-    this.header.textContent = `${this.config.title} (${dateRange})`;
+    // Format date range as "Nov 02 - Nov 08"
+    let dateRangeFormatted = '';
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const startMonth = start.toLocaleDateString('en-US', { month: 'short' });
+      const endMonth = end.toLocaleDateString('en-US', { month: 'short' });
+      const startDay = String(start.getDate()).padStart(2, '0');
+      const endDay = String(end.getDate()).padStart(2, '0');
+      dateRangeFormatted = `${startMonth} ${startDay} - ${endMonth} ${endDay}`;
+    }
+
+    this.header.textContent = dateRangeFormatted
+      ? `${this.config.title} - ${dateRangeFormatted}`
+      : this.config.title;
 
     // Day order based on week start
     const dayOrder = weekStart === 'Monday'
