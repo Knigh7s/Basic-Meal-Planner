@@ -159,9 +159,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         data = DEFAULT_DATA.copy()
 
     # Normalize
-    data.setdefault("settings", {"week_start": "Sunday"})
+    data.setdefault("settings", {"week_start": "Sunday", "days_after_today": 3})
     data.setdefault("scheduled", [])
     data.setdefault("library", [])
+    # Ensure days_after_today exists in settings
+    if "days_after_today" not in data["settings"]:
+        data["settings"]["days_after_today"] = 3
     for m in data["scheduled"]:
         m.setdefault("id", uuid.uuid4().hex)
         m.setdefault("recipe_url", "")
@@ -350,6 +353,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.bus.async_fire(EVENT_UPDATED)
 
     hass.services.async_register(DOMAIN, "promote_future_to_week", svc_promote_future)
+
+    async def svc_update_settings(call: ServiceCall):
+        """Update settings."""
+        settings_data = dict(call.data)
+        data["settings"].update(settings_data)
+        await _save_and_notify()
+
+    hass.services.async_register(DOMAIN, "update_settings", svc_update_settings)
 
     # ---------- WebSocket commands (register BEFORE returning) ----------
     from homeassistant.components import websocket_api

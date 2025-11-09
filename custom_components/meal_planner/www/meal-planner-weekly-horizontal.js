@@ -41,32 +41,29 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
 
   updateCard(entity) {
     const days = entity.attributes.days || {};
-    const weekStart = entity.attributes.week_start || this.config.week_start;
+    const daysToShow = entity.attributes.days_to_show || 7;
 
     this.header.textContent = this.config.title;
 
-    // Day order based on week start
-    const dayOrder = weekStart === 'Monday'
-      ? ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
-      : ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    // Build day order from day0, day1, day2, etc.
+    const dayOrder = [];
+    for (let i = 0; i < daysToShow; i++) {
+      dayOrder.push(`day${i}`);
+    }
 
     const mealTimes = ['breakfast', 'lunch', 'dinner'];
     if (this.config.show_snacks) {
       mealTimes.push('snack');
     }
 
-    // Get today's day code
-    const today = new Date();
-    const todayCode = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][today.getDay()];
-
     // Build table
     let html = '<table class="meal-grid"><thead><tr><th class="corner-cell"></th>';
 
     // Header row (days)
-    dayOrder.forEach(day => {
+    dayOrder.forEach((day, index) => {
       const dayData = days[day] || {};
       const label = dayData.label || day.toUpperCase();
-      const isToday = day === todayCode;
+      const isToday = index === 0;  // day0 is always today
 
       // Get day name and date number
       const dayParts = label.split(' ');
@@ -86,10 +83,10 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
     mealTimes.forEach(mealTime => {
       html += `<tr><th class="meal-time">${this.capitalize(mealTime)}</th>`;
 
-      dayOrder.forEach(day => {
+      dayOrder.forEach((day, index) => {
         const meal = days[day]?.[mealTime] || '';
         const isEmpty = !meal || meal.trim() === '';
-        const isToday = day === todayCode;
+        const isToday = index === 0;  // day0 is always today
 
         if (isEmpty && !this.config.show_empty) {
           html += `<td class="empty ${isToday ? 'today' : ''}"></td>`;

@@ -41,31 +41,29 @@ class MealPlannerWeeklyVertical extends HTMLElement {
 
   updateCard(entity) {
     const days = entity.attributes.days || {};
-    const weekStart = entity.attributes.week_start || this.config.week_start;
+    const totalDays = entity.attributes.total_days || 7;
+    const todayIndex = entity.attributes.today_index || 3;
 
     this.header.textContent = this.config.title;
 
-    // Day order
-    const dayOrder = weekStart === 'Monday'
-      ? ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
-      : ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    // Build day order from day0, day1, day2, etc.
+    const dayOrder = [];
+    for (let i = 0; i < totalDays; i++) {
+      dayOrder.push(`day${i}`);
+    }
 
     const mealTimes = ['breakfast', 'lunch', 'dinner'];
     if (this.config.show_snacks) {
       mealTimes.push('snack');
     }
 
-    // Get today's day code
-    const today = new Date();
-    const todayCode = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][today.getDay()];
-
     let html = '<div class="day-list">';
 
-    dayOrder.forEach(day => {
+    dayOrder.forEach((day, index) => {
       const dayData = days[day] || {};
       const label = dayData.label || day.toUpperCase();
       const dateStr = dayData.date || '';
-      const isToday = day === todayCode;
+      const isToday = index === todayIndex;  // today is at the specified index
 
       // Get day name and date number
       const dayParts = label.split(' ');

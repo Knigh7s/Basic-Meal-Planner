@@ -162,6 +162,25 @@ class MealPlannerApp {
     }
   }
 
+  async saveSettings() {
+    if (!this.hass) {
+      console.warn('[Meal Planner] No HASS connection - cannot save settings');
+      return false;
+    }
+
+    try {
+      console.log('[Meal Planner] Saving settings:', this.data.settings);
+
+      await this.callService('meal_planner/update_settings', this.data.settings);
+
+      console.log('[Meal Planner] Settings saved successfully');
+      return true;
+    } catch (error) {
+      console.error('[Meal Planner] Failed to save settings:', error);
+      return false;
+    }
+  }
+
   async addMeal(meal) {
     if (!this.hass) {
       console.warn('[Meal Planner] No HASS connection - cannot add meal');
@@ -250,6 +269,21 @@ class MealPlannerApp {
       searchInput.addEventListener('input', (e) => {
         this.searchQuery = e.target.value.toLowerCase();
         this.renderMealsLibrary();
+      });
+    }
+
+    // Days after today setting
+    const daysAfterTodayInput = document.getElementById('days-after-today');
+    if (daysAfterTodayInput) {
+      // Set initial value from settings
+      daysAfterTodayInput.value = this.data.settings?.days_after_today || 3;
+
+      daysAfterTodayInput.addEventListener('change', async (e) => {
+        const newValue = parseInt(e.target.value);
+        if (newValue >= 0 && newValue <= 6) {
+          this.data.settings.days_after_today = newValue;
+          await this.saveSettings();
+        }
       });
     }
 

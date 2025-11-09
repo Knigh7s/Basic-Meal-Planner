@@ -107,25 +107,36 @@ class WeeklyMealsSensor(SensorEntity):
     def _recalc(self) -> None:
         """Recalculate sensor state and attributes."""
         today = datetime.now().date()
-        week_start = self.data.get("settings", {}).get("week_start", "Sunday")
-        start, end = _current_week_bounds(today, week_start)
+        days_after = self.data.get("settings", {}).get("days_after_today", 3)
 
-        days_order = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
-        day_labels = {
-            "sun": "Sun", "mon": "Mon", "tue": "Tue", "wed": "Wed",
-            "thu": "Thu", "fri": "Fri", "sat": "Sat",
-        }
-        grid = {
-            k: {"label": day_labels[k], "breakfast": "", "lunch": "", "dinner": "", "snack": "", "date": ""}
-            for k in days_order
-        }
+        # Calculate days before to maintain 7 day total
+        # Cap days_after at 6 to prevent exceeding 7 total
+        days_after = min(days_after, 6)
+        days_before = 6 - days_after
+        total_days = 7  # Always 7 days
 
-        # Add date numbers to labels
-        for i, day_key in enumerate(days_order):
+        start = today - timedelta(days=days_before)
+        end = today + timedelta(days=days_after)
+
+        # Build grid for rolling days
+        grid = {}
+        day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+        for i in range(total_days):
             day_date = start + timedelta(days=i)
-            grid[day_key]["label"] = f"{day_labels[day_key]} {day_date.day}"
-            grid[day_key]["date"] = day_date.isoformat()
+            day_key = f"day{i}"
+            day_name = day_names[day_date.weekday()]
 
+            grid[day_key] = {
+                "label": f"{day_name} {day_date.day}",
+                "date": day_date.isoformat(),
+                "breakfast": "",
+                "lunch": "",
+                "dinner": "",
+                "snack": ""
+            }
+
+        # Populate meals
         for m in self.data.get("scheduled", []):
             ds = (m.get("date") or "").strip()
             if not ds:
@@ -136,15 +147,20 @@ class WeeklyMealsSensor(SensorEntity):
                 continue
 
             if start <= d <= end:
-                mapping = {6: "sun", 0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat"}
-                k = mapping[d.weekday()]
-                slot = (m.get("meal_time") or "Dinner").strip().lower()
-                if slot in ("breakfast", "lunch", "dinner", "snack"):
-                    grid[k][slot] = m.get("name", "")
+                # Find which day index this is
+                days_diff = (d - start).days
+                if 0 <= days_diff < total_days:
+                    day_key = f"day{days_diff}"
+                    slot = (m.get("meal_time") or "Dinner").strip().lower()
+                    if slot in ("breakfast", "lunch", "dinner", "snack"):
+                        grid[day_key][slot] = m.get("name", "")
 
         self._attr_native_value = f"{start.isoformat()} to {end.isoformat()}"
         self._attr_extra_state_attributes = {
-            "week_start": week_start,
+            "days_after_today": days_after,
+            "days_before_today": days_before,
+            "total_days": total_days,
+            "today_index": days_before,  # today is at index = days_before
             "start": start.isoformat(),
             "end": end.isoformat(),
             "days": grid,
