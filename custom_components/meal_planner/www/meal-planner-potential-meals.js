@@ -121,7 +121,7 @@ class MealPlannerPotentialMeals extends HTMLElement {
 
       .meal-list {
         list-style: none;
-        padding: 0;
+        padding: 10px;
         margin: 0;
         display: flex;
         flex-direction: column;
@@ -138,17 +138,7 @@ class MealPlannerPotentialMeals extends HTMLElement {
           rgba(var(--rgb-primary-color, 3, 169, 244), 0.02) 100%);
         border-radius: 10px;
         border-left: 3px solid rgba(var(--rgb-primary-color, 3, 169, 244), 0.3);
-        transition: all 0.2s ease;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      }
-
-      .meal-item:hover {
-        background: linear-gradient(90deg,
-          rgba(var(--rgb-primary-color, 3, 169, 244), 0.15) 0%,
-          rgba(var(--rgb-primary-color, 3, 169, 244), 0.05) 100%);
-        border-left-color: rgba(var(--rgb-primary-color, 3, 169, 244), 0.5);
-        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
-        transform: translateX(3px);
       }
 
       .meal-number {
@@ -181,15 +171,6 @@ class MealPlannerPotentialMeals extends HTMLElement {
         color: var(--secondary-text-color, #888);
         font-style: italic;
         font-size: 0.9em;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-      }
-
-      .more-items::before {
-        content: '⬇️';
-        font-size: 1.1em;
       }
 
       .empty-state {

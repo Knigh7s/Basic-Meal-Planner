@@ -85,8 +85,7 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
 
     // Meal time rows
     mealTimes.forEach(mealTime => {
-      const icon = this.getMealIcon(mealTime);
-      html += `<tr><th class="meal-time"><span class="meal-icon">${icon}</span>${this.capitalize(mealTime)}</th>`;
+      html += `<tr><th class="meal-time">${this.capitalize(mealTime)}</th>`;
 
       dayOrder.forEach(day => {
         const meal = days[day]?.[mealTime] || '';
@@ -107,16 +106,6 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
 
     html += '</tbody></table>';
     this.content.innerHTML = html;
-  }
-
-  getMealIcon(mealTime) {
-    const icons = {
-      breakfast: '🍳',
-      lunch: '🥗',
-      dinner: '🍽️',
-      snack: '🍿'
-    };
-    return icons[mealTime] || '🍴';
   }
 
   capitalize(str) {
@@ -218,12 +207,6 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
         color: var(--primary-text-color, #fff);
       }
 
-      .meal-grid .meal-icon {
-        font-size: 1.2em;
-        margin-right: 8px;
-        vertical-align: middle;
-      }
-
       /* Meal cells */
       .meal-grid td {
         background: var(--card-background-color, #2b2b2b);
@@ -240,11 +223,6 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
         cursor: default;
       }
 
-      .meal-grid td.meal:hover {
-        background: rgba(var(--rgb-primary-color, 3, 169, 244), 0.15);
-        box-shadow: inset 0 0 0 1px rgba(var(--rgb-primary-color, 3, 169, 244), 0.3);
-      }
-
       .meal-grid td.today {
         background: linear-gradient(180deg,
           rgba(233, 30, 99, 0.2) 0%,
@@ -259,13 +237,6 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
           rgba(156, 39, 176, 0.2) 100%);
         font-weight: 600;
         color: #fff;
-      }
-
-      .meal-grid td.meal.today:hover {
-        background: linear-gradient(180deg,
-          rgba(233, 30, 99, 0.35) 0%,
-          rgba(156, 39, 176, 0.3) 100%);
-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
       }
 
       .meal-grid td.empty {

@@ -90,11 +90,9 @@ class MealPlannerWeeklyVertical extends HTMLElement {
         let hasMeals = false;
         mealTimes.forEach(mealTime => {
           const meal = dayData[mealTime] || '';
-          const icon = this.getMealIcon(mealTime);
           if (meal && meal.trim()) {
             hasMeals = true;
             html += `<div class="meal-item">`;
-            html += `<span class="meal-icon">${icon}</span>`;
             html += `<div class="meal-details">`;
             html += `<span class="meal-name">${this.escapeHtml(meal)}</span>`;
             html += `<span class="meal-time">${this.capitalize(mealTime)}</span>`;
@@ -114,16 +112,6 @@ class MealPlannerWeeklyVertical extends HTMLElement {
 
     html += '</div>';
     this.content.innerHTML = html;
-  }
-
-  getMealIcon(mealTime) {
-    const icons = {
-      breakfast: '🍳',
-      lunch: '🥗',
-      dinner: '🍽️',
-      snack: '🍿'
-    };
-    return icons[mealTime] || '🍴';
   }
 
   escapeHtml(text) {
@@ -156,13 +144,7 @@ class MealPlannerWeeklyVertical extends HTMLElement {
         overflow: hidden;
         background: var(--card-background-color, #2b2b2b);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        transition: all 0.3s ease;
         min-height: 60px;
-      }
-
-      .day-row:hover {
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-        transform: translateY(-2px);
       }
 
       .day-row.today {
@@ -229,12 +211,6 @@ class MealPlannerWeeklyVertical extends HTMLElement {
         padding: 6px 0;
       }
 
-      .meal-icon {
-        font-size: 1.5em;
-        line-height: 1;
-        flex-shrink: 0;
-      }
-
       .meal-details {
         flex: 1;
         display: flex;
@@ -263,11 +239,6 @@ class MealPlannerWeeklyVertical extends HTMLElement {
 
       .day-row.today .meal-time {
         color: rgba(255, 255, 255, 0.8);
-      }
-
-      .meal-time::before {
-        content: '🕐';
-        font-size: 0.9em;
       }
 
       .no-meals {
