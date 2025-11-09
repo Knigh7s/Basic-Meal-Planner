@@ -7,7 +7,7 @@ class MealPlannerPotentialMeals extends HTMLElement {
     this.config = {
       entity: (config && config.entity) || 'sensor.meal_planner_potential',
       max_items: (config && config.max_items) || 10,
-      show_count: (config && config.show_count !== false) !== false,
+      show_count: (config && config.show_count) || false,
       title: (config && config.title) || 'Potential Meals'
     };
 

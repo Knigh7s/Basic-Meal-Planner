@@ -377,17 +377,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         })
 
     @websocket_api.websocket_command({"type": f"{DOMAIN}/add", "name": str, "meal_time": str, "date": str, "recipe_url": str, "notes": str, "potential": bool})
-    @callback
-    def ws_add(hass, connection, msg):
-        hass.async_create_task(hass.services.async_call(DOMAIN, "add", {
+    async def ws_add(hass, connection, msg):
+        await hass.services.async_call(DOMAIN, "add", {
             "name": msg.get("name",""),
             "meal_time": msg.get("meal_time","Dinner"),
             "date": msg.get("date",""),
             "recipe_url": msg.get("recipe_url",""),
             "notes": msg.get("notes",""),
             "potential": msg.get("potential", False),
-        }))
-        connection.send_result(msg["id"], {"queued": True})
+        })
+        connection.send_result(msg["id"], {"success": True})
 
     @websocket_api.websocket_command({
         "type": f"{DOMAIN}/update",
@@ -400,8 +399,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "notes": str,
         "potential": bool,
     })
-    @callback
-    def ws_update(hass, connection, msg):
+    async def ws_update(hass, connection, msg):
         payload = {
             "row_id": msg.get("row_id", ""),
         }
@@ -411,37 +409,33 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if "potential" in msg:
             payload["potential"] = msg.get("potential", False)
 
-        hass.async_create_task(
-            hass.services.async_call(DOMAIN, "update", payload)
-        )
-        connection.send_result(msg["id"], {"queued": True})
+        await hass.services.async_call(DOMAIN, "update", payload)
+        connection.send_result(msg["id"], {"success": True})
 
     @websocket_api.websocket_command({"type": f"{DOMAIN}/bulk", "action": str, "ids": list, "date": str, "meal_time": str})
-    @callback
-    def ws_bulk(hass, connection, msg):
-        hass.async_create_task(hass.services.async_call(DOMAIN, "bulk", {
+    async def ws_bulk(hass, connection, msg):
+        await hass.services.async_call(DOMAIN, "bulk", {
             "action": msg.get("action",""),
             "ids": msg.get("ids",[]),
             "date": msg.get("date",""),
             "meal_time": msg.get("meal_time",""),
-        }))
-        connection.send_result(msg["id"], {"queued": True})
+        })
+        connection.send_result(msg["id"], {"success": True})
 
     @websocket_api.websocket_command({
         "type": f"{DOMAIN}/update_settings",
         vol.Optional("week_start"): str,
         vol.Optional("days_after_today"): int
     })
-    @callback
-    def ws_update_settings(hass, connection, msg):
+    async def ws_update_settings(hass, connection, msg):
         settings_data = {}
         if "week_start" in msg:
             settings_data["week_start"] = msg.get("week_start")
         if "days_after_today" in msg:
             settings_data["days_after_today"] = msg.get("days_after_today")
 
-        hass.async_create_task(hass.services.async_call(DOMAIN, "update_settings", settings_data))
-        connection.send_result(msg["id"], {"queued": True})
+        await hass.services.async_call(DOMAIN, "update_settings", settings_data)
+        connection.send_result(msg["id"], {"success": True})
 
     websocket_api.async_register_command(hass, ws_get)
     websocket_api.async_register_command(hass, ws_add)

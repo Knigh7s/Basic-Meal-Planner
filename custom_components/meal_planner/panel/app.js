@@ -240,10 +240,16 @@ class MealPlannerApp {
       });
     });
 
-    // Add meal button
+    // Add meal button (Dashboard)
     const addMealBtn = document.getElementById('add-meal-btn');
     if (addMealBtn) {
       addMealBtn.addEventListener('click', () => this.openMealModal());
+    }
+
+    // Add meal button (Library)
+    const addMealLibraryBtn = document.getElementById('add-meal-library-btn');
+    if (addMealLibraryBtn) {
+      addMealLibraryBtn.addEventListener('click', () => this.openMealModal());
     }
 
     // Settings button
@@ -426,18 +432,30 @@ class MealPlannerApp {
 
   renderMealsLibrary() {
     const content = document.getElementById('meals-content');
-    const library = this.data.library || [];
+    const scheduled = this.data.scheduled || [];
+
+    // Group meals by name to create library (unique meal names)
+    const libraryMap = new Map();
+    scheduled.forEach(meal => {
+      const key = meal.name.toLowerCase();
+      if (!libraryMap.has(key)) {
+        libraryMap.set(key, meal); // Use first instance of each meal name
+      }
+    });
+
+    // Convert to array and sort alphabetically
+    let uniqueMeals = Array.from(libraryMap.values()).sort((a, b) =>
+      a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+    );
 
     // Filter by search query
-    let filteredMeals = library;
     if (this.searchQuery) {
-      filteredMeals = library.filter(meal => {
-        const mealName = typeof meal === 'string' ? meal : meal.name;
-        return mealName.toLowerCase().includes(this.searchQuery);
-      });
+      uniqueMeals = uniqueMeals.filter(meal =>
+        meal.name.toLowerCase().includes(this.searchQuery)
+      );
     }
 
-    if (filteredMeals.length === 0) {
+    if (uniqueMeals.length === 0) {
       const message = this.searchQuery
         ? `No meals found matching "${this.escapeHtml(this.searchQuery)}"`
         : 'No meals in library yet';
@@ -461,28 +479,24 @@ class MealPlannerApp {
     html += '</tr></thead>';
     html += '<tbody>';
 
-    filteredMeals.forEach(meal => {
-      // Handle both string and object formats
-      const mealName = typeof meal === 'string' ? meal : meal.name;
-      const recipeUrl = typeof meal === 'object' ? meal.recipe_url || '' : '';
-      const notes = typeof meal === 'object' ? meal.notes || '' : '';
-
+    uniqueMeals.forEach(meal => {
       const mealData = JSON.stringify({
-        name: mealName,
-        date: '',
-        meal_time: 'Dinner',
-        recipe_url: recipeUrl,
-        notes: notes,
-        potential: false
+        id: meal.id,
+        name: meal.name,
+        date: meal.date || '',
+        meal_time: meal.meal_time || 'Dinner',
+        recipe_url: meal.recipe_url || '',
+        notes: meal.notes || '',
+        potential: meal.potential || false
       });
 
       html += '<tr>';
-      html += `<td>${this.escapeHtml(mealName)}</td>`;
-      html += `<td>${recipeUrl ? `<a href="${this.escapeHtml(recipeUrl)}" target="_blank">View Recipe</a>` : '-'}</td>`;
-      html += `<td>${notes ? this.escapeHtml(notes) : '-'}</td>`;
+      html += `<td>${this.escapeHtml(meal.name)}</td>`;
+      html += `<td>${meal.recipe_url ? `<a href="${this.escapeHtml(meal.recipe_url)}" target="_blank">View Recipe</a>` : '-'}</td>`;
+      html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td>
         <button class="edit-meal-btn btn-secondary" data-meal='${this.escapeHtml(mealData)}'>Edit</button>
-        <button class="delete-library-meal-btn btn-secondary" data-name='${this.escapeHtml(mealName)}'>Delete</button>
+        <button class="delete-library-meal-btn btn-secondary" data-name='${this.escapeHtml(meal.name)}'>Delete</button>
       </td>`;
       html += '</tr>';
     });
@@ -512,7 +526,6 @@ class MealPlannerApp {
     let html = '<div class="table-container"><table>';
     html += '<thead><tr>';
     html += '<th>Meal Name</th>';
-    html += '<th>Meal Time</th>';
     html += '<th>Recipe URL</th>';
     html += '<th>Notes</th>';
     html += '<th>Actions</th>';
@@ -532,12 +545,11 @@ class MealPlannerApp {
 
       html += '<tr>';
       html += `<td>${this.escapeHtml(meal.name)}</td>`;
-      html += `<td><span class="badge badge-secondary">${this.capitalize(meal.meal_time)}</span></td>`;
       html += `<td>${meal.recipe_url ? `<a href="${this.escapeHtml(meal.recipe_url)}" target="_blank">View Recipe</a>` : '-'}</td>`;
       html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td>
         <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}'>Schedule</button>
-        <button class="delete-meal-btn btn-secondary" data-meal='${this.escapeHtml(mealData)}'>Delete</button>
+        <button class="delete-meal-btn btn-danger" data-meal='${this.escapeHtml(mealData)}'>🗑️ Delete</button>
       </td>`;
       html += '</tr>';
     });
