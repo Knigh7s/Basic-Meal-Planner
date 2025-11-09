@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, date
 from typing import Optional
 import uuid
 
+import voluptuous as vol
+
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.components.frontend import (
     async_register_built_in_panel,
@@ -425,10 +427,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         }))
         connection.send_result(msg["id"], {"queued": True})
 
+    @websocket_api.websocket_command({
+        "type": f"{DOMAIN}/update_settings",
+        vol.Optional("week_start"): str,
+        vol.Optional("days_after_today"): int
+    })
+    @callback
+    def ws_update_settings(hass, connection, msg):
+        settings_data = {}
+        if "week_start" in msg:
+            settings_data["week_start"] = msg.get("week_start")
+        if "days_after_today" in msg:
+            settings_data["days_after_today"] = msg.get("days_after_today")
+
+        hass.async_create_task(hass.services.async_call(DOMAIN, "update_settings", settings_data))
+        connection.send_result(msg["id"], {"queued": True})
+
     websocket_api.async_register_command(hass, ws_get)
     websocket_api.async_register_command(hass, ws_add)
     websocket_api.async_register_command(hass, ws_update)
     websocket_api.async_register_command(hass, ws_bulk)
+    websocket_api.async_register_command(hass, ws_update_settings)
 
     # ---------- Serve static admin panel (no cache) ----------
     panel_dir = Path(__file__).parent / "panel"
