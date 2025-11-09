@@ -97,12 +97,23 @@ class MealPlannerApp {
   }
 
   async callService(type, data = {}) {
+    console.log('[Meal Planner] callService called with:', { type, data });
+
     // Use WebSocket API if available
     if (this.hass && this.hass.callWS && !this.hass.useFetchAPI) {
-      return await this.hass.callWS({ type, ...data });
+      console.log('[Meal Planner] Using WebSocket API');
+      try {
+        const result = await this.hass.callWS({ type, ...data });
+        console.log('[Meal Planner] WebSocket result:', result);
+        return result;
+      } catch (error) {
+        console.error('[Meal Planner] WebSocket call failed:', error);
+        throw error;
+      }
     }
 
     // Fallback to fetch API
+    console.log('[Meal Planner] Using Fetch API');
     try {
       const response = await fetch('/api/websocket', {
         method: 'POST',
@@ -600,47 +611,68 @@ class MealPlannerApp {
   }
 
   async handleFormSubmit() {
-    const name = document.getElementById('meal-name').value.trim();
-    const date = document.getElementById('meal-date').value;
-    const mealTime = document.getElementById('meal-time').value;
-    const recipe = document.getElementById('meal-recipe').value.trim();
-    const notes = document.getElementById('meal-notes').value.trim();
-    const potential = document.getElementById('meal-potential').checked;
-
-    if (!name) {
-      alert('Please enter a meal name');
+    // Prevent double submission
+    if (this.isSaving) {
+      console.log('[Meal Planner] Already saving, ignoring duplicate submission');
       return;
     }
+    this.isSaving = true;
 
-    const mealData = {
-      name,
-      date: date || '',
-      meal_time: mealTime,
-      recipe_url: recipe || '',
-      notes: notes || '',
-      potential: potential
-    };
-
-    let success = false;
-
-    if (this.editingMeal && this.editingMeal.id) {
-      // Update existing meal
-      console.log('[Meal Planner] Calling updateMeal with ID:', this.editingMeal.id);
-      success = await this.updateMeal(this.editingMeal.id, mealData);
-      console.log('[Meal Planner] updateMeal returned:', success);
-    } else {
-      // Add new meal
-      console.log('[Meal Planner] Calling addMeal');
-      success = await this.addMeal(mealData);
-      console.log('[Meal Planner] addMeal returned:', success);
+    const submitBtn = document.querySelector('#meal-form button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving...';
     }
 
-    if (success) {
-      console.log('[Meal Planner] Closing modal after successful save');
-      this.closeMealModal();
-    } else {
-      console.log('[Meal Planner] Not closing modal - save failed');
-      alert('Failed to save meal. Please try again.');
+    try {
+      const name = document.getElementById('meal-name').value.trim();
+      const date = document.getElementById('meal-date').value;
+      const mealTime = document.getElementById('meal-time').value;
+      const recipe = document.getElementById('meal-recipe').value.trim();
+      const notes = document.getElementById('meal-notes').value.trim();
+      const potential = document.getElementById('meal-potential').checked;
+
+      if (!name) {
+        alert('Please enter a meal name');
+        return;
+      }
+
+      const mealData = {
+        name,
+        date: date || '',
+        meal_time: mealTime,
+        recipe_url: recipe || '',
+        notes: notes || '',
+        potential: potential
+      };
+
+      let success = false;
+
+      if (this.editingMeal && this.editingMeal.id) {
+        // Update existing meal
+        console.log('[Meal Planner] Calling updateMeal with ID:', this.editingMeal.id);
+        success = await this.updateMeal(this.editingMeal.id, mealData);
+        console.log('[Meal Planner] updateMeal returned:', success);
+      } else {
+        // Add new meal
+        console.log('[Meal Planner] Calling addMeal');
+        success = await this.addMeal(mealData);
+        console.log('[Meal Planner] addMeal returned:', success);
+      }
+
+      if (success) {
+        console.log('[Meal Planner] Closing modal after successful save');
+        this.closeMealModal();
+      } else {
+        console.log('[Meal Planner] Not closing modal - save failed');
+        alert('Failed to save meal. Please try again.');
+      }
+    } finally {
+      this.isSaving = false;
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save';
+      }
     }
   }
 
