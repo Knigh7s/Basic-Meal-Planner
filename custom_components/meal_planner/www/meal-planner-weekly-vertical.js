@@ -9,7 +9,7 @@ class MealPlannerWeeklyVertical extends HTMLElement {
       week_start: (config && config.week_start) || 'Sunday',
       compact: (config && config.compact) || false,
       show_snacks: (config && config.show_snacks !== false) !== false,
-      title: (config && config.title) || 'This Week'
+      title: (config && config.title) || 'Meal Plan'
     };
 
     if (!this.content) {
@@ -42,28 +42,8 @@ class MealPlannerWeeklyVertical extends HTMLElement {
   updateCard(entity) {
     const days = entity.attributes.days || {};
     const weekStart = entity.attributes.week_start || this.config.week_start;
-    const startDate = entity.attributes.start || '';
-    const endDate = entity.attributes.end || '';
 
-    // Format date range as "Nov 02 - Nov 08"
-    let dateRangeFormatted = '';
-    if (startDate && endDate) {
-      // Parse dates without timezone conversion
-      const startParts = startDate.split('-');
-      const endParts = endDate.split('-');
-      const start = new Date(parseInt(startParts[0]), parseInt(startParts[1]) - 1, parseInt(startParts[2]));
-      const end = new Date(parseInt(endParts[0]), parseInt(endParts[1]) - 1, parseInt(endParts[2]));
-
-      const startMonth = start.toLocaleDateString('en-US', { month: 'short' });
-      const endMonth = end.toLocaleDateString('en-US', { month: 'short' });
-      const startDay = String(start.getDate()).padStart(2, '0');
-      const endDay = String(end.getDate()).padStart(2, '0');
-      dateRangeFormatted = `${startMonth} ${startDay} - ${endMonth} ${endDay}`;
-    }
-
-    this.header.textContent = dateRangeFormatted
-      ? `${this.config.title} - ${dateRangeFormatted}`
-      : this.config.title;
+    this.header.textContent = this.config.title;
 
     // Day order
     const dayOrder = weekStart === 'Monday'
