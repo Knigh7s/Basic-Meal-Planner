@@ -190,7 +190,9 @@ class MealPlannerApp {
     try {
       console.log('[Meal Planner] Adding meal:', meal);
 
-      await this.callService('meal_planner/add', meal);
+      const result = await this.callService('meal_planner/add', meal);
+
+      console.log('[Meal Planner] Add result:', result);
 
       // Reload data
       await this.loadData();
@@ -200,6 +202,7 @@ class MealPlannerApp {
       return true;
     } catch (error) {
       console.error('[Meal Planner] Failed to add meal:', error);
+      console.error('[Meal Planner] Error details:', error.message, error.stack);
       return false;
     }
   }
@@ -213,10 +216,12 @@ class MealPlannerApp {
     try {
       console.log('[Meal Planner] Updating meal:', { mealId, newMeal });
 
-      await this.callService('meal_planner/update', {
+      const result = await this.callService('meal_planner/update', {
         row_id: mealId,
         ...newMeal
       });
+
+      console.log('[Meal Planner] Update result:', result);
 
       // Reload data
       await this.loadData();
@@ -226,6 +231,7 @@ class MealPlannerApp {
       return true;
     } catch (error) {
       console.error('[Meal Planner] Failed to update meal:', error);
+      console.error('[Meal Planner] Error details:', error.message, error.stack);
       return false;
     }
   }
@@ -619,15 +625,21 @@ class MealPlannerApp {
 
     if (this.editingMeal && this.editingMeal.id) {
       // Update existing meal
+      console.log('[Meal Planner] Calling updateMeal with ID:', this.editingMeal.id);
       success = await this.updateMeal(this.editingMeal.id, mealData);
+      console.log('[Meal Planner] updateMeal returned:', success);
     } else {
       // Add new meal
+      console.log('[Meal Planner] Calling addMeal');
       success = await this.addMeal(mealData);
+      console.log('[Meal Planner] addMeal returned:', success);
     }
 
     if (success) {
+      console.log('[Meal Planner] Closing modal after successful save');
       this.closeMealModal();
     } else {
+      console.log('[Meal Planner] Not closing modal - save failed');
       alert('Failed to save meal. Please try again.');
     }
   }
