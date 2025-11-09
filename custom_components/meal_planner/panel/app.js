@@ -270,6 +270,13 @@ class MealPlannerApp {
         const mealData = JSON.parse(btn.getAttribute('data-meal'));
         this.deleteMeal(mealData);
       }
+
+      // Delete library meal (all instances with this name)
+      if (target.classList.contains('delete-library-meal-btn') || target.closest('.delete-library-meal-btn')) {
+        const btn = target.classList.contains('delete-library-meal-btn') ? target : target.closest('.delete-library-meal-btn');
+        const mealName = btn.getAttribute('data-name');
+        this.deleteLibraryMeal(mealName);
+      }
     });
   }
 
@@ -432,7 +439,8 @@ class MealPlannerApp {
       html += `<td>${recipeUrl ? `<a href="${this.escapeHtml(recipeUrl)}" target="_blank">View Recipe</a>` : '-'}</td>`;
       html += `<td>${notes ? this.escapeHtml(notes) : '-'}</td>`;
       html += `<td>
-        <button class="edit-meal-btn btn-secondary" data-meal='${this.escapeHtml(mealData)}'>Schedule</button>
+        <button class="edit-meal-btn btn-secondary" data-meal='${this.escapeHtml(mealData)}'>Edit</button>
+        <button class="delete-library-meal-btn btn-secondary" data-name='${this.escapeHtml(mealName)}'>Delete</button>
       </td>`;
       html += '</tr>';
     });
@@ -600,6 +608,56 @@ class MealPlannerApp {
     } catch (error) {
       console.error('[Meal Planner] Failed to delete meal:', error);
       alert('Failed to delete meal. Please try again.');
+    }
+  }
+
+  async deleteLibraryMeal(mealName) {
+    // Find all scheduled meals with this name
+    const scheduled = this.data.scheduled || [];
+    const mealsToDelete = scheduled.filter(m => m.name === mealName);
+
+    if (mealsToDelete.length === 0) {
+      alert(`No scheduled meals found for "${mealName}"`);
+      return;
+    }
+
+    const count = mealsToDelete.length;
+    const message = count === 1
+      ? `Delete "${mealName}"? This will remove 1 scheduled meal.`
+      : `Delete "${mealName}"? This will remove all ${count} scheduled meals with this name.`;
+
+    if (!confirm(message)) {
+      return;
+    }
+
+    if (!this.hass) {
+      console.warn('[Meal Planner] No HASS connection - cannot delete meals');
+      alert('Failed to delete meals. Please try again.');
+      return;
+    }
+
+    try {
+      console.log('[Meal Planner] Deleting library meal:', mealName, 'Count:', count);
+
+      // Get all IDs
+      const ids = mealsToDelete.map(m => m.id);
+
+      // Use bulk delete service
+      await this.callService('meal_planner/bulk', {
+        action: 'delete',
+        ids: ids,
+        date: '',
+        meal_time: ''
+      });
+
+      // Reload data
+      await this.loadData();
+      this.renderCurrentView();
+
+      console.log('[Meal Planner] Library meal deleted successfully');
+    } catch (error) {
+      console.error('[Meal Planner] Failed to delete library meal:', error);
+      alert('Failed to delete meals. Please try again.');
     }
   }
 
