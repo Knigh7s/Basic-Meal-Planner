@@ -15,7 +15,7 @@ class MealPlannerWeeklyVertical extends HTMLElement {
     if (!this.content) {
       this.innerHTML = `
         <style>${this.constructor.styles}</style>
-        <ha-card>
+        <ha-card class="meal-planner-vertical-card">
           <div class="card-header">
             <div class="name"></div>
           </div>
@@ -149,14 +149,14 @@ class MealPlannerWeeklyVertical extends HTMLElement {
 
   static get styles() {
     return `
-      .day-list {
+      .meal-planner-vertical-card .day-list {
         display: flex;
         flex-direction: column;
         gap: 6px;
         padding: 4px;
       }
 
-      .day-row {
+      .meal-planner-vertical-card .day-row {
         display: flex;
         align-items: stretch;
         border-radius: 12px;
@@ -166,14 +166,14 @@ class MealPlannerWeeklyVertical extends HTMLElement {
         min-height: 60px;
       }
 
-      .day-row.today {
+      .meal-planner-vertical-card .day-row.today {
         background: linear-gradient(135deg,
           var(--primary-color, #e91e63) 0%,
           var(--accent-color, #9c27b0) 100%);
         box-shadow: 0 4px 12px rgba(233, 30, 99, 0.4);
       }
 
-      .date-col {
+      .meal-planner-vertical-card .date-col {
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -184,12 +184,12 @@ class MealPlannerWeeklyVertical extends HTMLElement {
         border-right: 2px solid rgba(255, 255, 255, 0.1);
       }
 
-      .day-row.today .date-col {
+      .meal-planner-vertical-card .day-row.today .date-col {
         background: rgba(255, 255, 255, 0.2);
         border-right-color: rgba(255, 255, 255, 0.3);
       }
 
-      .day-name {
+      .meal-planner-vertical-card .day-name {
         font-size: 0.75em;
         font-weight: 500;
         text-transform: uppercase;
@@ -198,23 +198,23 @@ class MealPlannerWeeklyVertical extends HTMLElement {
         margin-bottom: 2px;
       }
 
-      .day-row.today .day-name {
+      .meal-planner-vertical-card .day-row.today .day-name {
         color: rgba(255, 255, 255, 0.9);
       }
 
-      .date-num {
+      .meal-planner-vertical-card .date-num {
         font-size: 1.8em;
         font-weight: 700;
         line-height: 1;
         color: var(--primary-text-color, #fff);
       }
 
-      .day-row.today .date-num {
+      .meal-planner-vertical-card .day-row.today .date-num {
         color: #fff;
         text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
       }
 
-      .meals-col {
+      .meal-planner-vertical-card .meals-col {
         flex: 1;
         padding: 10px 14px;
         display: flex;
@@ -223,32 +223,32 @@ class MealPlannerWeeklyVertical extends HTMLElement {
         justify-content: center;
       }
 
-      .meal-item {
+      .meal-planner-vertical-card .meal-item {
         display: flex;
         align-items: center;
         gap: 10px;
         padding: 6px 0;
       }
 
-      .meal-details {
+      .meal-planner-vertical-card .meal-details {
         flex: 1;
         display: flex;
         flex-direction: column;
         gap: 2px;
       }
 
-      .meal-name {
+      .meal-planner-vertical-card .meal-name {
         font-size: 0.95em;
         font-weight: 500;
         color: var(--primary-text-color, #fff);
         line-height: 1.3;
       }
 
-      .day-row.today .meal-name {
+      .meal-planner-vertical-card .day-row.today .meal-name {
         color: #fff;
       }
 
-      .meal-time {
+      .meal-planner-vertical-card .meal-time {
         font-size: 0.75em;
         color: var(--secondary-text-color, #aaa);
         display: flex;
@@ -256,22 +256,22 @@ class MealPlannerWeeklyVertical extends HTMLElement {
         gap: 4px;
       }
 
-      .day-row.today .meal-time {
+      .meal-planner-vertical-card .day-row.today .meal-time {
         color: rgba(255, 255, 255, 0.8);
       }
 
-      .no-meals {
+      .meal-planner-vertical-card .no-meals {
         font-size: 0.85em;
         color: var(--secondary-text-color, #666);
         font-style: italic;
         padding: 4px 0;
       }
 
-      .day-row.today .no-meals {
+      .meal-planner-vertical-card .day-row.today .no-meals {
         color: rgba(255, 255, 255, 0.7);
       }
 
-      .error {
+      .meal-planner-vertical-card .error {
         color: var(--error-color);
         padding: 16px;
         text-align: center;

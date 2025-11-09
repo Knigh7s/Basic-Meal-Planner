@@ -14,7 +14,7 @@ class MealPlannerPotentialMeals extends HTMLElement {
     if (!this.content) {
       this.innerHTML = `
         <style>${this.constructor.styles}</style>
-        <ha-card>
+        <ha-card class="meal-planner-potential-card">
           <div class="card-header">
             <div class="name"></div>
             <div class="count-badge"></div>
@@ -98,14 +98,14 @@ class MealPlannerPotentialMeals extends HTMLElement {
 
   static get styles() {
     return `
-      .card-header {
+      .meal-planner-potential-card .card-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
         padding-right: 16px;
       }
 
-      .count-badge {
+      .meal-planner-potential-card .count-badge {
         background: linear-gradient(135deg,
           var(--primary-color, #e91e63) 0%,
           var(--accent-color, #9c27b0) 100%);
@@ -119,7 +119,7 @@ class MealPlannerPotentialMeals extends HTMLElement {
         box-shadow: 0 2px 8px rgba(233, 30, 99, 0.3);
       }
 
-      .meal-list {
+      .meal-planner-potential-card .meal-list {
         list-style: none;
         padding: 10px;
         margin: 0;
@@ -128,7 +128,7 @@ class MealPlannerPotentialMeals extends HTMLElement {
         gap: 6px;
       }
 
-      .meal-item {
+      .meal-planner-potential-card .meal-item {
         display: flex;
         align-items: center;
         gap: 14px;
@@ -141,7 +141,7 @@ class MealPlannerPotentialMeals extends HTMLElement {
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
       }
 
-      .meal-number {
+      .meal-planner-potential-card .meal-number {
         background: linear-gradient(135deg,
           rgba(var(--rgb-primary-color, 3, 169, 244), 0.25) 0%,
           rgba(var(--rgb-primary-color, 3, 169, 244), 0.15) 100%);
@@ -158,14 +158,14 @@ class MealPlannerPotentialMeals extends HTMLElement {
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
       }
 
-      .meal-name {
+      .meal-planner-potential-card .meal-name {
         flex: 1;
         font-weight: 500;
         color: var(--primary-text-color, #fff);
         line-height: 1.4;
       }
 
-      .more-items {
+      .meal-planner-potential-card .more-items {
         text-align: center;
         padding: 16px 0 8px;
         color: var(--secondary-text-color, #888);
@@ -173,7 +173,7 @@ class MealPlannerPotentialMeals extends HTMLElement {
         font-size: 0.9em;
       }
 
-      .empty-state {
+      .meal-planner-potential-card .empty-state {
         text-align: center;
         padding: 48px 24px;
         background: linear-gradient(135deg,
@@ -183,21 +183,21 @@ class MealPlannerPotentialMeals extends HTMLElement {
         margin: 8px;
       }
 
-      .empty-icon {
+      .meal-planner-potential-card .empty-icon {
         font-size: 4em;
         margin-bottom: 16px;
         filter: grayscale(0.3);
         opacity: 0.8;
       }
 
-      .empty-text {
+      .meal-planner-potential-card .empty-text {
         font-size: 1.2em;
         font-weight: 600;
         margin-bottom: 10px;
         color: var(--primary-text-color, #fff);
       }
 
-      .empty-hint {
+      .meal-planner-potential-card .empty-hint {
         color: var(--secondary-text-color, #aaa);
         font-size: 0.95em;
         line-height: 1.5;
@@ -205,7 +205,7 @@ class MealPlannerPotentialMeals extends HTMLElement {
         margin: 0 auto;
       }
 
-      .error {
+      .meal-planner-potential-card .error {
         color: var(--error-color);
         padding: 16px;
         text-align: center;
