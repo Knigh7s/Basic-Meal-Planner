@@ -48,8 +48,12 @@ class MealPlannerWeeklyVertical extends HTMLElement {
     // Format date range as "Nov 02 - Nov 08"
     let dateRangeFormatted = '';
     if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
+      // Parse dates without timezone conversion
+      const startParts = startDate.split('-');
+      const endParts = endDate.split('-');
+      const start = new Date(parseInt(startParts[0]), parseInt(startParts[1]) - 1, parseInt(startParts[2]));
+      const end = new Date(parseInt(endParts[0]), parseInt(endParts[1]) - 1, parseInt(endParts[2]));
+
       const startMonth = start.toLocaleDateString('en-US', { month: 'short' });
       const endMonth = end.toLocaleDateString('en-US', { month: 'short' });
       const startDay = String(start.getDate()).padStart(2, '0');
@@ -155,18 +159,18 @@ class MealPlannerWeeklyVertical extends HTMLElement {
       .day-row {
         display: flex;
         align-items: stretch;
+        border-radius: 12px;
+        overflow: hidden;
+        background: var(--card-background-color, #2b2b2b);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
         min-height: 60px;
-        border-bottom: 1px solid var(--divider-color, rgba(255, 255, 255, 0.1));
-      }
-
-      .day-row:last-child {
-        border-bottom: none;
       }
 
       .day-row.today {
         background: linear-gradient(135deg,
           var(--primary-color, #e91e63) 0%,
           var(--accent-color, #9c27b0) 100%);
+        box-shadow: 0 4px 12px rgba(233, 30, 99, 0.4);
       }
 
       .date-col {

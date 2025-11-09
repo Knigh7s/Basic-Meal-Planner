@@ -48,8 +48,12 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
     // Format date range as "Nov 02 - Nov 08"
     let dateRangeFormatted = '';
     if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
+      // Parse dates without timezone conversion
+      const startParts = startDate.split('-');
+      const endParts = endDate.split('-');
+      const start = new Date(parseInt(startParts[0]), parseInt(startParts[1]) - 1, parseInt(startParts[2]));
+      const end = new Date(parseInt(endParts[0]), parseInt(endParts[1]) - 1, parseInt(endParts[2]));
+
       const startMonth = start.toLocaleDateString('en-US', { month: 'short' });
       const endMonth = end.toLocaleDateString('en-US', { month: 'short' });
       const startDay = String(start.getDate()).padStart(2, '0');
