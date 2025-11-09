@@ -420,8 +420,8 @@ class MealPlannerApp {
       html += `<td>${meal.recipe_url ? `<a href="${this.escapeHtml(meal.recipe_url)}" target="_blank">View Recipe</a>` : '-'}</td>`;
       html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td>
-        <button class="edit-meal-btn btn-secondary" data-meal='${this.escapeHtml(mealData)}'>Edit</button>
-        <button class="delete-meal-btn btn-secondary" data-meal='${this.escapeHtml(mealData)}'>Delete</button>
+        <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}'>Edit</button>
+        <button class="delete-meal-btn btn-danger" data-meal='${this.escapeHtml(mealData)}'>🗑️ Delete</button>
       </td>`;
       html += '</tr>';
     });
@@ -495,8 +495,8 @@ class MealPlannerApp {
       html += `<td>${meal.recipe_url ? `<a href="${this.escapeHtml(meal.recipe_url)}" target="_blank">View Recipe</a>` : '-'}</td>`;
       html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td>
-        <button class="edit-meal-btn btn-secondary" data-meal='${this.escapeHtml(mealData)}'>Edit</button>
-        <button class="delete-library-meal-btn btn-secondary" data-name='${this.escapeHtml(meal.name)}'>Delete</button>
+        <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}'>Edit</button>
+        <button class="delete-library-meal-btn btn-danger" data-name='${this.escapeHtml(meal.name)}'>🗑️ Delete</button>
       </td>`;
       html += '</tr>';
     });
