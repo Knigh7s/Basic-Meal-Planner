@@ -376,7 +376,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "library": data.get("library", []),
         })
 
-    @websocket_api.websocket_command({"type": f"{DOMAIN}/add", "name": str, "meal_time": str, "date": str, "recipe_url": str, "notes": str, "potential": bool})
+    @websocket_api.websocket_command({
+        "type": f"{DOMAIN}/add",
+        "name": str,
+        vol.Optional("meal_time"): str,
+        vol.Optional("date"): str,
+        vol.Optional("recipe_url"): str,
+        vol.Optional("notes"): str,
+        vol.Optional("potential"): bool,
+    })
     async def ws_add(hass, connection, msg):
         await hass.services.async_call(DOMAIN, "add", {
             "name": msg.get("name",""),
@@ -391,13 +399,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     @websocket_api.websocket_command({
         "type": f"{DOMAIN}/update",
         "row_id": str,
-        # the rest are optional; only update what is provided
-        "name": str,
-        "meal_time": str,
-        "date": str,
-        "recipe_url": str,
-        "notes": str,
-        "potential": bool,
+        vol.Optional("name"): str,
+        vol.Optional("meal_time"): str,
+        vol.Optional("date"): str,
+        vol.Optional("recipe_url"): str,
+        vol.Optional("notes"): str,
+        vol.Optional("potential"): bool,
     })
     async def ws_update(hass, connection, msg):
         payload = {
@@ -412,7 +419,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await hass.services.async_call(DOMAIN, "update", payload)
         connection.send_result(msg["id"], {"success": True})
 
-    @websocket_api.websocket_command({"type": f"{DOMAIN}/bulk", "action": str, "ids": list, "date": str, "meal_time": str})
+    @websocket_api.websocket_command({
+        "type": f"{DOMAIN}/bulk",
+        "action": str,
+        "ids": list,
+        vol.Optional("date"): str,
+        vol.Optional("meal_time"): str,
+    })
     async def ws_bulk(hass, connection, msg):
         await hass.services.async_call(DOMAIN, "bulk", {
             "action": msg.get("action",""),
