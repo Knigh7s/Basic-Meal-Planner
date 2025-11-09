@@ -258,19 +258,22 @@ class MealPlannerWeeklyVertical extends HTMLElement {
   }
 }
 
-customElements.define('meal-planner-weekly-vertical', MealPlannerWeeklyVertical);
+// Only define if not already defined
+if (!customElements.get('meal-planner-weekly-vertical')) {
+  customElements.define('meal-planner-weekly-vertical', MealPlannerWeeklyVertical);
 
-window.customCards = window.customCards || [];
-window.customCards.push({
-  type: 'meal-planner-weekly-vertical',
-  name: 'Meal Planner Weekly Vertical',
-  description: 'Weekly meal plan in vertical day-by-day layout',
-  preview: false,
-  documentationURL: 'https://github.com/Knigh7s/Basic-Meal-Planner'
-});
+  window.customCards = window.customCards || [];
+  window.customCards.push({
+    type: 'meal-planner-weekly-vertical',
+    name: 'Meal Planner Weekly Vertical',
+    description: 'Weekly meal plan in vertical day-by-day layout',
+    preview: false,
+    documentationURL: 'https://github.com/Knigh7s/Basic-Meal-Planner'
+  });
+}
 
 console.info(
-  '%c MEAL-PLANNER-WEEKLY-VERTICAL %c v0.1.0 ',
+  '%c MEAL-PLANNER-WEEKLY-VERTICAL %c v0.1.1 ',
   'color: white; background: green; font-weight: 700;',
   'color: green; background: white; font-weight: 700;'
 );

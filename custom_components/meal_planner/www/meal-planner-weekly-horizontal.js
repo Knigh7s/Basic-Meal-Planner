@@ -274,21 +274,22 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
   }
 }
 
-// Define the custom element
-customElements.define('meal-planner-weekly-horizontal', MealPlannerWeeklyHorizontal);
+// Only define if not already defined
+if (!customElements.get('meal-planner-weekly-horizontal')) {
+  customElements.define('meal-planner-weekly-horizontal', MealPlannerWeeklyHorizontal);
 
-// Register with Home Assistant
-window.customCards = window.customCards || [];
-window.customCards.push({
-  type: 'meal-planner-weekly-horizontal',
-  name: 'Meal Planner Weekly Horizontal',
-  description: 'Weekly meal plan in calendar grid layout',
-  preview: false,
-  documentationURL: 'https://github.com/Knigh7s/Basic-Meal-Planner'
-});
+  window.customCards = window.customCards || [];
+  window.customCards.push({
+    type: 'meal-planner-weekly-horizontal',
+    name: 'Meal Planner Weekly Horizontal',
+    description: 'Weekly meal plan in calendar grid layout',
+    preview: false,
+    documentationURL: 'https://github.com/Knigh7s/Basic-Meal-Planner'
+  });
+}
 
 console.info(
-  '%c MEAL-PLANNER-WEEKLY-HORIZONTAL %c v0.1.0 ',
+  '%c MEAL-PLANNER-WEEKLY-HORIZONTAL %c v0.1.1 ',
   'color: white; background: green; font-weight: 700;',
   'color: green; background: white; font-weight: 700;'
 );

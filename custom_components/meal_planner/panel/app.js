@@ -246,7 +246,13 @@ class MealPlannerApp {
       addMealBtn.addEventListener('click', () => this.openMealModal());
     }
 
-    // Modal controls
+    // Settings button
+    const settingsBtn = document.getElementById('settings-btn');
+    if (settingsBtn) {
+      settingsBtn.addEventListener('click', () => this.openSettingsModal());
+    }
+
+    // Meal Modal controls
     const modal = document.getElementById('meal-modal');
     const modalClose = modal.querySelector('.modal-close');
     const modalCancel = modal.querySelector('.modal-cancel');
@@ -256,11 +262,28 @@ class MealPlannerApp {
       el.addEventListener('click', () => this.closeMealModal());
     });
 
-    // Form submission
+    // Meal Form submission
     const form = document.getElementById('meal-form');
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       this.handleFormSubmit();
+    });
+
+    // Settings Modal controls
+    const settingsModal = document.getElementById('settings-modal');
+    const settingsModalClose = settingsModal.querySelector('.modal-close');
+    const settingsModalCancel = settingsModal.querySelector('.modal-cancel');
+    const settingsModalOverlay = settingsModal.querySelector('.modal-overlay');
+
+    [settingsModalClose, settingsModalCancel, settingsModalOverlay].forEach(el => {
+      el.addEventListener('click', () => this.closeSettingsModal());
+    });
+
+    // Settings Form submission
+    const settingsForm = document.getElementById('settings-form');
+    settingsForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.handleSettingsSubmit();
     });
 
     // Search
@@ -269,21 +292,6 @@ class MealPlannerApp {
       searchInput.addEventListener('input', (e) => {
         this.searchQuery = e.target.value.toLowerCase();
         this.renderMealsLibrary();
-      });
-    }
-
-    // Days after today setting
-    const daysAfterTodayInput = document.getElementById('days-after-today');
-    if (daysAfterTodayInput) {
-      // Set initial value from settings
-      daysAfterTodayInput.value = this.data.settings?.days_after_today || 3;
-
-      daysAfterTodayInput.addEventListener('change', async (e) => {
-        const newValue = parseInt(e.target.value);
-        if (newValue >= 0 && newValue <= 6) {
-          this.data.settings.days_after_today = newValue;
-          await this.saveSettings();
-        }
       });
     }
 
@@ -609,6 +617,44 @@ class MealPlannerApp {
       this.closeMealModal();
     } else {
       alert('Failed to save meal. Please try again.');
+    }
+  }
+
+  openSettingsModal() {
+    const modal = document.getElementById('settings-modal');
+    const input = document.getElementById('settings-days-after');
+
+    // Populate current value
+    input.value = this.data.settings?.days_after_today || 3;
+
+    modal.classList.remove('hidden');
+  }
+
+  closeSettingsModal() {
+    const modal = document.getElementById('settings-modal');
+    modal.classList.add('hidden');
+  }
+
+  async handleSettingsSubmit() {
+    const daysAfter = parseInt(document.getElementById('settings-days-after').value);
+
+    if (daysAfter < 0 || daysAfter > 6) {
+      alert('Days after today must be between 0 and 6');
+      return;
+    }
+
+    // Update settings
+    this.data.settings.days_after_today = daysAfter;
+
+    const success = await this.saveSettings();
+
+    if (success) {
+      this.closeSettingsModal();
+      // Reload to show updated view
+      await this.loadData();
+      this.renderCurrentView();
+    } else {
+      alert('Failed to save settings. Please try again.');
     }
   }
 

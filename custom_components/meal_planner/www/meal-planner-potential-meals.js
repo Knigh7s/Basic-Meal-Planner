@@ -217,19 +217,22 @@ class MealPlannerPotentialMeals extends HTMLElement {
   }
 }
 
-customElements.define('meal-planner-potential-meals', MealPlannerPotentialMeals);
+// Only define if not already defined
+if (!customElements.get('meal-planner-potential-meals')) {
+  customElements.define('meal-planner-potential-meals', MealPlannerPotentialMeals);
 
-window.customCards = window.customCards || [];
-window.customCards.push({
-  type: 'meal-planner-potential-meals',
-  name: 'Meal Planner Potential Meals',
-  description: 'List of unscheduled potential meals',
-  preview: false,
-  documentationURL: 'https://github.com/Knigh7s/Basic-Meal-Planner'
-});
+  window.customCards = window.customCards || [];
+  window.customCards.push({
+    type: 'meal-planner-potential-meals',
+    name: 'Meal Planner Potential Meals',
+    description: 'List of unscheduled potential meals',
+    preview: false,
+    documentationURL: 'https://github.com/Knigh7s/Basic-Meal-Planner'
+  });
+}
 
 console.info(
-  '%c MEAL-PLANNER-POTENTIAL-MEALS %c v0.1.0 ',
+  '%c MEAL-PLANNER-POTENTIAL-MEALS %c v0.1.1 ',
   'color: white; background: green; font-weight: 700;',
   'color: green; background: white; font-weight: 700;'
 );
