@@ -174,6 +174,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN].update({"store": store, "data": data})
 
+    # Clean up any duplicate/old entity registrations
+    from homeassistant.helpers import entity_registry as er
+    entity_reg = er.async_get(hass)
+
+    # Remove any old duplicate entities
+    for entity_id in list(entity_reg.entities):
+        entity_entry = entity_reg.entities[entity_id]
+        if entity_entry.config_entry_id == entry.entry_id and entity_entry.platform == DOMAIN:
+            # Old entities were registered with platform=DOMAIN, new ones use platform="sensor"
+            _LOGGER.info(f"Removing old entity registration: {entity_id}")
+            entity_reg.async_remove(entity_id)
+
     # Forward to sensor platform
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
 
