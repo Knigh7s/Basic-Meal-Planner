@@ -367,12 +367,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # ---------- WebSocket commands (register BEFORE returning) ----------
     from homeassistant.components import websocket_api
 
-    @websocket_api.websocket_command(
-        vol.Schema({
-            vol.Required("type"): f"{DOMAIN}/get",
-            vol.Required("id"): int,
-        })
-    )
+    @websocket_api.websocket_command({"type": f"{DOMAIN}/get"})
     @callback
     def ws_get(hass, connection, msg):
         connection.send_result(msg["id"], {
@@ -381,18 +376,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "library": data.get("library", []),
         })
 
-    @websocket_api.websocket_command(
-        vol.Schema({
-            vol.Required("type"): f"{DOMAIN}/add",
-            vol.Required("id"): int,
-            vol.Required("name"): str,
-            vol.Optional("meal_time", default="Dinner"): str,
-            vol.Optional("date", default=""): str,
-            vol.Optional("recipe_url", default=""): str,
-            vol.Optional("notes", default=""): str,
-            vol.Optional("potential", default=False): bool,
-        })
-    )
+    @websocket_api.websocket_command({"type": f"{DOMAIN}/add", "name": str})
     async def ws_add(hass, connection, msg):
         await hass.services.async_call(DOMAIN, "add", {
             "name": msg.get("name",""),
@@ -404,19 +388,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         })
         connection.send_result(msg["id"], {"success": True})
 
-    @websocket_api.websocket_command(
-        vol.Schema({
-            vol.Required("type"): f"{DOMAIN}/update",
-            vol.Required("id"): int,
-            vol.Required("row_id"): str,
-            vol.Optional("name", default=""): str,
-            vol.Optional("meal_time", default=""): str,
-            vol.Optional("date", default=""): str,
-            vol.Optional("recipe_url", default=""): str,
-            vol.Optional("notes", default=""): str,
-            vol.Optional("potential", default=False): bool,
-        })
-    )
+    @websocket_api.websocket_command({"type": f"{DOMAIN}/update", "row_id": str})
     async def ws_update(hass, connection, msg):
         payload = {
             "row_id": msg.get("row_id", ""),
@@ -430,16 +402,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await hass.services.async_call(DOMAIN, "update", payload)
         connection.send_result(msg["id"], {"success": True})
 
-    @websocket_api.websocket_command(
-        vol.Schema({
-            vol.Required("type"): f"{DOMAIN}/bulk",
-            vol.Required("id"): int,
-            vol.Required("action"): str,
-            vol.Required("ids"): list,
-            vol.Optional("date", default=""): str,
-            vol.Optional("meal_time", default=""): str,
-        })
-    )
+    @websocket_api.websocket_command({"type": f"{DOMAIN}/bulk", "action": str, "ids": list})
     async def ws_bulk(hass, connection, msg):
         await hass.services.async_call(DOMAIN, "bulk", {
             "action": msg.get("action",""),
@@ -449,14 +412,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         })
         connection.send_result(msg["id"], {"success": True})
 
-    @websocket_api.websocket_command(
-        vol.Schema({
-            vol.Required("type"): f"{DOMAIN}/update_settings",
-            vol.Required("id"): int,
-            vol.Optional("week_start"): str,
-            vol.Optional("days_after_today"): int,
-        })
-    )
+    @websocket_api.websocket_command({"type": f"{DOMAIN}/update_settings"})
     async def ws_update_settings(hass, connection, msg):
         settings_data = {}
         if "week_start" in msg:
