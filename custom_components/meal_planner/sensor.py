@@ -8,7 +8,6 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
 
@@ -34,12 +33,11 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Meal Planner sensors."""
-    store = hass.data[DOMAIN]["store"]
     data = hass.data[DOMAIN]["data"]
 
     sensors = [
-        PotentialMealsSensor(hass, store, data, entry.entry_id),
-        WeeklyMealsSensor(hass, store, data, entry.entry_id),
+        PotentialMealsSensor(hass, data, entry.entry_id),
+        WeeklyMealsSensor(hass, data, entry.entry_id),
     ]
 
     async_add_entities(sensors, True)
@@ -59,10 +57,9 @@ class PotentialMealsSensor(SensorEntity):
     _attr_icon = "mdi:lightbulb-outline"
     _attr_should_poll = False
 
-    def __init__(self, hass: HomeAssistant, store: Store, data: dict, entry_id: str):
+    def __init__(self, hass: HomeAssistant, data: dict, entry_id: str):
         """Initialize the sensor."""
         self.hass = hass
-        self.store = store
         self.data = data
         self._attr_unique_id = f"{entry_id}_meal_planner_potential"
         self._attr_suggested_object_id = "meal_planner_potential"
@@ -102,10 +99,9 @@ class WeeklyMealsSensor(SensorEntity):
     _attr_icon = "mdi:calendar-week"
     _attr_should_poll = False
 
-    def __init__(self, hass: HomeAssistant, store: Store, data: dict, entry_id: str):
+    def __init__(self, hass: HomeAssistant, data: dict, entry_id: str):
         """Initialize the sensor."""
         self.hass = hass
-        self.store = store
         self.data = data
         self._attr_unique_id = f"{entry_id}_meal_planner_week"
         self._attr_suggested_object_id = "meal_planner_week"
