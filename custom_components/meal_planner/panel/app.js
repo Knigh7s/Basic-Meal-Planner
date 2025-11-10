@@ -220,6 +220,63 @@ class MealPlannerApp {
     }
   }
 
+  // Modal helpers
+  showAlert(message) {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('alert-modal');
+      const messageEl = document.getElementById('alert-message');
+      const okBtn = modal.querySelector('.alert-ok');
+      const closeBtn = modal.querySelector('.modal-close');
+      const overlay = modal.querySelector('.modal-overlay');
+
+      messageEl.textContent = message;
+      modal.classList.remove('hidden');
+
+      const closeModal = () => {
+        modal.classList.add('hidden');
+        okBtn.removeEventListener('click', closeModal);
+        closeBtn.removeEventListener('click', closeModal);
+        overlay.removeEventListener('click', closeModal);
+        resolve();
+      };
+
+      okBtn.addEventListener('click', closeModal);
+      closeBtn.addEventListener('click', closeModal);
+      overlay.addEventListener('click', closeModal);
+    });
+  }
+
+  showConfirm(message) {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('confirm-modal');
+      const messageEl = document.getElementById('confirm-message');
+      const okBtn = modal.querySelector('.confirm-ok');
+      const cancelBtn = modal.querySelector('.confirm-cancel');
+      const closeBtn = modal.querySelector('.modal-close');
+      const overlay = modal.querySelector('.modal-overlay');
+
+      messageEl.textContent = message;
+      modal.classList.remove('hidden');
+
+      const closeModal = (result) => {
+        modal.classList.add('hidden');
+        okBtn.removeEventListener('click', okHandler);
+        cancelBtn.removeEventListener('click', cancelHandler);
+        closeBtn.removeEventListener('click', cancelHandler);
+        overlay.removeEventListener('click', cancelHandler);
+        resolve(result);
+      };
+
+      const okHandler = () => closeModal(true);
+      const cancelHandler = () => closeModal(false);
+
+      okBtn.addEventListener('click', okHandler);
+      cancelBtn.addEventListener('click', cancelHandler);
+      closeBtn.addEventListener('click', cancelHandler);
+      overlay.addEventListener('click', cancelHandler);
+    });
+  }
+
   async addMeal(meal) {
     if (!this.hass) {
       console.warn('[Meal Planner] No HASS connection - cannot add meal');
@@ -661,7 +718,7 @@ class MealPlannerApp {
       const potential = document.getElementById('meal-potential').checked;
 
       if (!name) {
-        alert('Please enter a meal name');
+        await this.showAlert('Please enter a meal name');
         return;
       }
 
@@ -693,7 +750,7 @@ class MealPlannerApp {
         this.closeMealModal();
       } else {
         console.log('[Meal Planner] Not closing modal - save failed');
-        alert('Failed to save meal. Please try again.');
+        await this.showAlert('Failed to save meal. Please try again.');
       }
     } finally {
       this.isSaving = false;
@@ -723,7 +780,7 @@ class MealPlannerApp {
     const daysAfter = parseInt(document.getElementById('settings-days-after').value);
 
     if (daysAfter < 0 || daysAfter > 6) {
-      alert('Days after today must be between 0 and 6');
+      await this.showAlert('Days after today must be between 0 and 6');
       return;
     }
 
@@ -738,18 +795,19 @@ class MealPlannerApp {
       await this.loadData();
       this.renderCurrentView();
     } else {
-      alert('Failed to save settings. Please try again.');
+      await this.showAlert('Failed to save settings. Please try again.');
     }
   }
 
   async deleteMeal(meal) {
-    if (!confirm(`Delete "${meal.name}"?`)) {
+    const confirmed = await this.showConfirm(`Delete "${meal.name}"?`);
+    if (!confirmed) {
       return;
     }
 
     if (!this.hass) {
       console.warn('[Meal Planner] No HASS connection - cannot delete meal');
-      alert('Failed to delete meal. Please try again.');
+      await this.showAlert('Failed to delete meal. Please try again.');
       return;
     }
 
@@ -771,7 +829,7 @@ class MealPlannerApp {
       console.log('[Meal Planner] Meal deleted successfully');
     } catch (error) {
       console.error('[Meal Planner] Failed to delete meal:', error);
-      alert('Failed to delete meal. Please try again.');
+      await this.showAlert('Failed to delete meal. Please try again.');
     }
   }
 
@@ -781,7 +839,7 @@ class MealPlannerApp {
     const mealsToDelete = scheduled.filter(m => m.name === mealName);
 
     if (mealsToDelete.length === 0) {
-      alert(`No scheduled meals found for "${mealName}"`);
+      await this.showAlert(`No scheduled meals found for "${mealName}"`);
       return;
     }
 
@@ -790,13 +848,14 @@ class MealPlannerApp {
       ? `Delete "${mealName}"? This will remove 1 scheduled meal.`
       : `Delete "${mealName}"? This will remove all ${count} scheduled meals with this name.`;
 
-    if (!confirm(message)) {
+    const confirmed = await this.showConfirm(message);
+    if (!confirmed) {
       return;
     }
 
     if (!this.hass) {
       console.warn('[Meal Planner] No HASS connection - cannot delete meals');
-      alert('Failed to delete meals. Please try again.');
+      await this.showAlert('Failed to delete meals. Please try again.');
       return;
     }
 
@@ -821,7 +880,7 @@ class MealPlannerApp {
       console.log('[Meal Planner] Library meal deleted successfully');
     } catch (error) {
       console.error('[Meal Planner] Failed to delete library meal:', error);
-      alert('Failed to delete meals. Please try again.');
+      await this.showAlert('Failed to delete meals. Please try again.');
     }
   }
 
