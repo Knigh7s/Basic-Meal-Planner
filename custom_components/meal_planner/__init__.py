@@ -154,14 +154,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.info("MEAL PLANNER: Starting async_setup_entry")
     _LOGGER.info("=" * 80)
 
-    # Load data
-    # Store automatically uses .storage/ directory and adds .json extension
-    # File location: .storage/meal_planner/meals.json
-    # Store key should be: meal_planner/meals
+    # Load data - Read the file directly to bypass Store key matching issues
+    import json
+    storage_path = Path(hass.config.path(".storage")) / STORAGE_DIR / STORAGE_FILE
+    _LOGGER.info("Attempting to load data from: %s", storage_path)
+
+    # Still create Store for saving later
     store = Store(hass, 1, f"{STORAGE_DIR}/{STORAGE_FILE.replace('.json', '')}")
-    _LOGGER.info("Loading data from store with key: %s/%s", STORAGE_DIR, STORAGE_FILE.replace('.json', ''))
-    data = await store.async_load()
-    _LOGGER.info("Raw data loaded from store: %s", data)
+
+    data = None
+    if storage_path.exists():
+        try:
+            with open(storage_path, "r", encoding="utf-8") as f:
+                file_contents = json.load(f)
+                # Store files wrap data in a "data" key
+                if "data" in file_contents:
+                    data = file_contents["data"]
+                    _LOGGER.info("Loaded data from file successfully")
+                else:
+                    data = file_contents
+                    _LOGGER.warning("File doesn't have 'data' wrapper, using raw contents")
+        except Exception as e:
+            _LOGGER.error("Failed to read meals.json: %s", e)
+            data = None
+    else:
+        _LOGGER.warning("File does not exist at: %s", storage_path)
 
     if not isinstance(data, dict):
         _LOGGER.warning("Data is not a dict, using defaults. Type was: %s", type(data))
