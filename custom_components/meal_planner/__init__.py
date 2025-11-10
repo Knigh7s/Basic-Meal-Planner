@@ -367,7 +367,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # ---------- WebSocket commands (register BEFORE returning) ----------
     from homeassistant.components import websocket_api
 
-    @websocket_api.websocket_command({"type": f"{DOMAIN}/get"})
+    @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/get"})
     @callback
     def ws_get(hass, connection, msg):
         connection.send_result(msg["id"], {
@@ -377,8 +377,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         })
 
     @websocket_api.websocket_command({
-        "type": f"{DOMAIN}/add",
-        "name": str,
+        vol.Required("type"): f"{DOMAIN}/add",
+        vol.Required("name"): str,
         vol.Optional("meal_time"): str,
         vol.Optional("date"): str,
         vol.Optional("recipe_url"): str,
@@ -397,8 +397,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         connection.send_result(msg["id"], {"success": True})
 
     @websocket_api.websocket_command({
-        "type": f"{DOMAIN}/update",
-        "row_id": str,
+        vol.Required("type"): f"{DOMAIN}/update",
+        vol.Required("row_id"): str,
         vol.Optional("name"): str,
         vol.Optional("meal_time"): str,
         vol.Optional("date"): str,
@@ -407,6 +407,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         vol.Optional("potential"): bool,
     })
     async def ws_update(hass, connection, msg):
+        _LOGGER.info("WS update called with msg: %s", msg)
         payload = {
             "row_id": msg.get("row_id", ""),
         }
@@ -416,13 +417,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if "potential" in msg:
             payload["potential"] = msg.get("potential", False)
 
+        _LOGGER.info("Calling update service with payload: %s", payload)
         await hass.services.async_call(DOMAIN, "update", payload)
+        _LOGGER.info("Update service completed, sending result")
         connection.send_result(msg["id"], {"success": True})
 
     @websocket_api.websocket_command({
-        "type": f"{DOMAIN}/bulk",
-        "action": str,
-        "ids": list,
+        vol.Required("type"): f"{DOMAIN}/bulk",
+        vol.Required("action"): str,
+        vol.Required("ids"): list,
         vol.Optional("date"): str,
         vol.Optional("meal_time"): str,
     })
@@ -436,7 +439,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         connection.send_result(msg["id"], {"success": True})
 
     @websocket_api.websocket_command({
-        "type": f"{DOMAIN}/update_settings",
+        vol.Required("type"): f"{DOMAIN}/update_settings",
         vol.Optional("week_start"): str,
         vol.Optional("days_after_today"): int,
     })
@@ -450,11 +453,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await hass.services.async_call(DOMAIN, "update_settings", settings_data)
         connection.send_result(msg["id"], {"success": True})
 
+    _LOGGER.info("Registering websocket commands")
     websocket_api.async_register_command(hass, ws_get)
     websocket_api.async_register_command(hass, ws_add)
     websocket_api.async_register_command(hass, ws_update)
     websocket_api.async_register_command(hass, ws_bulk)
     websocket_api.async_register_command(hass, ws_update_settings)
+    _LOGGER.info("Websocket commands registered successfully")
 
     # ---------- Serve static admin panel (no cache) ----------
     panel_dir = Path(__file__).parent / "panel"

@@ -103,7 +103,14 @@ class MealPlannerApp {
     if (this.hass && this.hass.callWS && !this.hass.useFetchAPI) {
       console.log('[Meal Planner] Using WebSocket API');
       try {
-        const result = await this.hass.callWS({ type, ...data });
+        // Add timeout
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('WebSocket timeout after 10s')), 10000)
+        );
+
+        const wsPromise = this.hass.callWS({ type, ...data });
+
+        const result = await Promise.race([wsPromise, timeoutPromise]);
         console.log('[Meal Planner] WebSocket result:', result);
         return result;
       } catch (error) {
