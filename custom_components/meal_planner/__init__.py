@@ -158,9 +158,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Store class automatically uses .storage/ directory
     # This will look for the file at: .storage/meal_planner/meals.json
     store = Store(hass, 1, f"meal_planner/{STORAGE_FILE.replace('.json', '')}")
+    _LOGGER.info("Loading data from store path: meal_planner/%s", STORAGE_FILE.replace('.json', ''))
     data = await store.async_load()
+    _LOGGER.info("Raw data loaded from store: %s", data)
+
     if not isinstance(data, dict):
+        _LOGGER.warning("Data is not a dict, using defaults. Type was: %s", type(data))
         data = DEFAULT_DATA.copy()
+
+    _LOGGER.info("Data keys: %s", list(data.keys()) if data else "None")
+    _LOGGER.info("Scheduled count: %s", len(data.get("scheduled", [])))
+    _LOGGER.info("Library count: %s", len(data.get("library", [])))
 
     # Normalize
     data.setdefault("settings", {"week_start": "Sunday", "days_after_today": 3})
