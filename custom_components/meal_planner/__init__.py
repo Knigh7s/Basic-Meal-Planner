@@ -223,7 +223,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
 
     async def _save_and_notify():
-        await store.async_save(data)
+        # Save directly to file (not using Store to avoid key mismatch issues)
+        import json
+        from homeassistant.util import json as hass_json
+
+        try:
+            # Wrap data in Store format
+            file_data = {
+                "version": 1,
+                "minor_version": 1,
+                "key": ".storage/meal_planner/meals.json",  # Keep original key
+                "data": data
+            }
+
+            # Write atomically using Home Assistant's helper
+            await hass.async_add_executor_job(
+                hass_json.save_json,
+                str(storage_path),
+                file_data
+            )
+            _LOGGER.info("Data saved successfully to %s", storage_path)
+        except Exception as e:
+            _LOGGER.error("Failed to save data: %s", e, exc_info=True)
+
         sensors = hass.data[DOMAIN].get("sensors", {})
         if "potential" in sensors:
             await sensors["potential"].async_update_from_data()
