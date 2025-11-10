@@ -155,10 +155,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.info("=" * 80)
 
     # Load data
-    # Store class automatically uses .storage/ directory
-    # This will look for the file at: .storage/meal_planner/meals.json
-    store = Store(hass, 1, f"meal_planner/{STORAGE_FILE.replace('.json', '')}")
-    _LOGGER.info("Loading data from store path: meal_planner/%s", STORAGE_FILE.replace('.json', ''))
+    # Store automatically uses .storage/ directory and adds .json extension
+    # File location: .storage/meal_planner/meals.json
+    # Store key should be: meal_planner/meals
+    store = Store(hass, 1, f"{STORAGE_DIR}/{STORAGE_FILE.replace('.json', '')}")
+    _LOGGER.info("Loading data from store with key: %s/%s", STORAGE_DIR, STORAGE_FILE.replace('.json', ''))
     data = await store.async_load()
     _LOGGER.info("Raw data loaded from store: %s", data)
 
