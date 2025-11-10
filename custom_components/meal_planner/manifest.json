@@ -1,7 +1,7 @@
 {
   "domain": "meal_planner",
   "name": "Basic Meal Planner",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "documentation": "https://github.com/Knigh7s/Basic-Meal-Planner",
   "issue_tracker": "https://github.com/Knigh7s/Basic-Meal-Planner/issues",
   "codeowners": [ "@Knigh7s" ],
