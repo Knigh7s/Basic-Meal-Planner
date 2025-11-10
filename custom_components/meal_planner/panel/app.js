@@ -108,13 +108,19 @@ class MealPlannerApp {
           setTimeout(() => reject(new Error('WebSocket timeout after 10s')), 10000)
         );
 
-        const wsPromise = this.hass.callWS({ type, ...data });
+        const wsPayload = { type, ...data };
+        console.log('[Meal Planner] Sending WebSocket payload:', wsPayload);
+        console.log('[Meal Planner] Payload keys:', Object.keys(wsPayload));
+        const wsPromise = this.hass.callWS(wsPayload);
 
         const result = await Promise.race([wsPromise, timeoutPromise]);
         console.log('[Meal Planner] WebSocket result:', result);
         return result;
       } catch (error) {
         console.error('[Meal Planner] WebSocket call failed:', error);
+        console.error('[Meal Planner] Error type:', error.constructor.name);
+        console.error('[Meal Planner] Error message:', error.message);
+        if (error.code) console.error('[Meal Planner] Error code:', error.code);
         throw error;
       }
     }
