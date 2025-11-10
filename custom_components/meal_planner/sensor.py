@@ -70,12 +70,19 @@ class PotentialMealsSensor(SensorEntity):
 
     def _recalc(self) -> None:
         """Recalculate sensor state and attributes."""
-        items = [
-            (m.get("name") or "")
-            for m in self.data.get("scheduled", [])
-            if m.get("potential") == True
-        ]
-        items = [i for i in items if i]
+        # Build library lookup
+        library_map = {lib.get("id"): lib for lib in self.data.get("library", [])}
+
+        # Get potential meal names
+        items = []
+        for m in self.data.get("scheduled", []):
+            if m.get("potential") == True:
+                library_entry = library_map.get(m.get("library_id"))
+                if library_entry:
+                    name = library_entry.get("name", "")
+                    if name:
+                        items.append(name)
+
         self._attr_native_value = len(items)
         self._attr_extra_state_attributes = {
             "items": sorted(items, key=lambda s: s.lower())
@@ -118,6 +125,9 @@ class WeeklyMealsSensor(SensorEntity):
         start = today - timedelta(days=days_before)
         end = today + timedelta(days=days_after)
 
+        # Build library lookup
+        library_map = {lib.get("id"): lib for lib in self.data.get("library", [])}
+
         # Build grid for rolling days
         grid = {}
         day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -153,7 +163,10 @@ class WeeklyMealsSensor(SensorEntity):
                     day_key = f"day{days_diff}"
                     slot = (m.get("meal_time") or "Dinner").strip().lower()
                     if slot in ("breakfast", "lunch", "dinner", "snack"):
-                        grid[day_key][slot] = m.get("name", "")
+                        # Look up meal name from library
+                        library_entry = library_map.get(m.get("library_id"))
+                        if library_entry:
+                            grid[day_key][slot] = library_entry.get("name", "")
 
         self._attr_native_value = f"{start.isoformat()} to {end.isoformat()}"
         self._attr_extra_state_attributes = {

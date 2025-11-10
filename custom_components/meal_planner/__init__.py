@@ -154,15 +154,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.info("MEAL PLANNER: Starting async_setup_entry")
     _LOGGER.info("=" * 80)
 
-    # New structure: 3 separate files
+    # New structure: 3 separate files in config/meal_planner/
     import json
     from homeassistant.util import json as hass_json
 
-    storage_base = Path(hass.config.path(".storage")) / STORAGE_DIR
+    storage_base = Path(hass.config.path(STORAGE_DIR))  # config/meal_planner/
     library_path = storage_base / "meal_library.json"
     scheduled_path = storage_base / "scheduled.json"
     settings_path = storage_base / "settings.json"
-    old_path = storage_base / STORAGE_FILE  # meals.json for migration
+
+    # Old location for migration
+    old_storage_base = Path(hass.config.path(".storage")) / STORAGE_DIR
+    old_path = old_storage_base / STORAGE_FILE  # .storage/meal_planner/meals.json
 
     # Ensure directory exists
     storage_base.mkdir(parents=True, exist_ok=True)
@@ -343,88 +346,166 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # ---------- Services ----------
     async def svc_add(call: ServiceCall):
+        """Add a meal - creates library entry and scheduled entry."""
         # Validate and sanitize inputs
         name = _sanitize_string(call.data.get("name", ""), MAX_NAME_LENGTH, "meal name")
         if not name:
             _LOGGER.warning("Meal name is required")
             return
 
+        recipe_url = _validate_url(call.data.get("recipe_url", ""))
+        notes = _sanitize_string(call.data.get("notes", ""), MAX_NOTES_LENGTH, "notes")
+
+        # Find or create library entry
+        library_entry = None
+        for lib_meal in data["library"]:
+            if lib_meal.get("name", "").lower() == name.lower():
+                library_entry = lib_meal
+                # Update library entry with latest recipe/notes
+                library_entry["recipe_url"] = recipe_url
+                library_entry["notes"] = notes
+                break
+
+        if not library_entry:
+            # Create new library entry
+            library_entry = {
+                "id": uuid.uuid4().hex,
+                "name": name,
+                "recipe_url": recipe_url,
+                "notes": notes
+            }
+            data["library"].append(library_entry)
+            if len(data["library"]) > MAX_LIBRARY_SIZE:
+                data["library"] = data["library"][-MAX_LIBRARY_SIZE:]
+
+        # Validate schedule info
         meal_time = (call.data.get("meal_time") or "Dinner").strip().title()
         if meal_time not in ("Breakfast", "Lunch", "Dinner", "Snack"):
             meal_time = "Dinner"
 
-        # Validate date format
         date_str = call.data.get("date", "")
         if date_str:
             validated_date = _validate_date(date_str)
             date_str = validated_date if validated_date else ""
 
-        recipe_url = _validate_url(call.data.get("recipe_url", ""))
-        notes = _sanitize_string(call.data.get("notes", ""), MAX_NOTES_LENGTH, "notes")
-
-        _upsert_library(data, name, recipe_url, notes)
         potential = call.data.get("potential", False)
+
+        # Create scheduled entry
         data["scheduled"].append({
             "id": uuid.uuid4().hex,
-            "name": name,
+            "library_id": library_entry["id"],
             "meal_time": meal_time,
             "date": date_str,
-            "recipe_url": recipe_url,
-            "notes": notes,
             "potential": potential,
         })
 
         # Enforce limits
-        _enforce_scheduled_limits(data)
-        await _save_and_notify()
+        if len(data["scheduled"]) > MAX_SCHEDULED_SIZE:
+            data["scheduled"] = data["scheduled"][-MAX_SCHEDULED_SIZE:]
+
+        await _save_and_notify(save_library=True, save_scheduled=True)
 
     hass.services.async_register(DOMAIN, "add", svc_add)
 
     async def svc_update(call: ServiceCall):
+        """Update a scheduled meal - updates library and/or scheduled entry."""
         row_id = (call.data.get("row_id") or "").strip()
         if not row_id:
             return
 
-        valid_times = ("Breakfast", "Lunch", "Dinner", "Snack")
-        updated = False
+        # Find the scheduled entry
+        scheduled_entry = None
         for m in data["scheduled"]:
             if m.get("id") == row_id:
-                # Update only provided fields with validation
-                if "name" in call.data:
-                    name = _sanitize_string(call.data.get("name", ""), MAX_NAME_LENGTH, "meal name")
-                    if name:
-                        m["name"] = name
-                        updated = True
-                if "meal_time" in call.data:
-                    mt = (call.data.get("meal_time") or "").strip().title()
-                    if mt in valid_times:
-                        m["meal_time"] = mt
-                        updated = True
-                if "date" in call.data:
-                    date_str = call.data.get("date", "")
-                    if date_str:
-                        validated_date = _validate_date(date_str)
-                        m["date"] = validated_date if validated_date else ""
-                    else:
-                        m["date"] = ""
-                    updated = True
-                if "recipe_url" in call.data:
-                    m["recipe_url"] = _validate_url(call.data.get("recipe_url", ""))
-                    updated = True
-                if "notes" in call.data:
-                    m["notes"] = _sanitize_string(call.data.get("notes", ""), MAX_NOTES_LENGTH, "notes")
-                    updated = True
-                if "potential" in call.data:
-                    m["potential"] = bool(call.data.get("potential", False))
-                    updated = True
+                scheduled_entry = m
                 break
 
-        if updated:
-            await _save_and_notify()
+        if not scheduled_entry:
+            _LOGGER.warning("Scheduled entry not found: %s", row_id)
+            return
+
+        save_library = False
+        save_scheduled = False
+
+        # Handle name change (requires library update)
+        if "name" in call.data:
+            new_name = _sanitize_string(call.data.get("name", ""), MAX_NAME_LENGTH, "meal name")
+            if new_name:
+                # Find current library entry
+                current_lib = None
+                for lib in data["library"]:
+                    if lib.get("id") == scheduled_entry.get("library_id"):
+                        current_lib = lib
+                        break
+
+                # Check if name is changing
+                if not current_lib or current_lib.get("name", "").lower() != new_name.lower():
+                    # Find or create library entry with new name
+                    new_lib = None
+                    for lib in data["library"]:
+                        if lib.get("name", "").lower() == new_name.lower():
+                            new_lib = lib
+                            break
+
+                    if not new_lib:
+                        # Create new library entry
+                        new_lib = {
+                            "id": uuid.uuid4().hex,
+                            "name": new_name,
+                            "recipe_url": call.data.get("recipe_url", "") if "recipe_url" in call.data else (current_lib.get("recipe_url", "") if current_lib else ""),
+                            "notes": call.data.get("notes", "") if "notes" in call.data else (current_lib.get("notes", "") if current_lib else "")
+                        }
+                        data["library"].append(new_lib)
+                        save_library = True
+
+                    # Update scheduled entry to reference new library entry
+                    scheduled_entry["library_id"] = new_lib["id"]
+                    save_scheduled = True
+                    save_library = True
+
+        # Update library entry (recipe_url, notes)
+        library_entry = None
+        for lib in data["library"]:
+            if lib.get("id") == scheduled_entry.get("library_id"):
+                library_entry = lib
+                break
+
+        if library_entry:
+            if "recipe_url" in call.data:
+                library_entry["recipe_url"] = _validate_url(call.data.get("recipe_url", ""))
+                save_library = True
+            if "notes" in call.data:
+                library_entry["notes"] = _sanitize_string(call.data.get("notes", ""), MAX_NOTES_LENGTH, "notes")
+                save_library = True
+
+        # Update scheduled entry (date, meal_time, potential)
+        valid_times = ("Breakfast", "Lunch", "Dinner", "Snack")
+        if "meal_time" in call.data:
+            mt = (call.data.get("meal_time") or "").strip().title()
+            if mt in valid_times:
+                scheduled_entry["meal_time"] = mt
+                save_scheduled = True
+
+        if "date" in call.data:
+            date_str = call.data.get("date", "")
+            if date_str:
+                validated_date = _validate_date(date_str)
+                scheduled_entry["date"] = validated_date if validated_date else ""
+            else:
+                scheduled_entry["date"] = ""
+            save_scheduled = True
+
+        if "potential" in call.data:
+            scheduled_entry["potential"] = bool(call.data.get("potential", False))
+            save_scheduled = True
+
+        if save_library or save_scheduled:
+            await _save_and_notify(save_library=save_library, save_scheduled=save_scheduled)
 
     hass.services.async_register(DOMAIN, "update", svc_update)
     
     async def svc_bulk(call: ServiceCall):
+        """Bulk operations on scheduled entries."""
         action = (call.data.get("action") or "").lower()
         ids = list(call.data.get("ids") or [])
         date_str = call.data.get("date", "")
@@ -465,17 +546,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 pass
 
         data["scheduled"] = new_list
-        await _save_and_notify()
+        await _save_and_notify(save_scheduled=True)
 
     hass.services.async_register(DOMAIN, "bulk", svc_bulk)
 
     async def svc_clear_potential(call: ServiceCall):
+        """Clear all potential (unscheduled) meals."""
         data["scheduled"] = [m for m in data["scheduled"] if (m.get("date") or "").strip()]
-        await _save_and_notify()
+        await _save_and_notify(save_scheduled=True)
 
     hass.services.async_register(DOMAIN, "clear_potential", svc_clear_potential)
 
     async def svc_clear_week(call: ServiceCall):
+        """Clear current week's scheduled meals."""
         today = datetime.now().date()
         start, end = _current_week_bounds(today, data["settings"]["week_start"])
         kept = []
@@ -485,11 +568,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 continue
             kept.append(m)
         data["scheduled"] = kept
-        await _save_and_notify()
+        await _save_and_notify(save_scheduled=True)
 
     hass.services.async_register(DOMAIN, "clear_week", svc_clear_week)
 
     async def svc_promote_future(call: ServiceCall):
+        """Fire update event."""
         hass.bus.async_fire(EVENT_UPDATED)
 
     hass.services.async_register(DOMAIN, "promote_future_to_week", svc_promote_future)
@@ -498,7 +582,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         """Update settings."""
         settings_data = dict(call.data)
         data["settings"].update(settings_data)
-        await _save_and_notify()
+        await _save_and_notify(save_settings=True)
 
     hass.services.async_register(DOMAIN, "update_settings", svc_update_settings)
 
@@ -509,10 +593,42 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/get"})
     @callback
     def ws_get(hass, connection, msg):
+        """Get data - merges library + scheduled for frontend compatibility."""
+        # Build library lookup
+        library_map = {lib.get("id"): lib for lib in data.get("library", [])}
+
+        # Merge scheduled with library data for frontend
+        merged_scheduled = []
+        for sched in data.get("scheduled", []):
+            library_entry = library_map.get(sched.get("library_id"))
+            merged_meal = {
+                "id": sched.get("id", ""),
+                "name": library_entry.get("name", "") if library_entry else "",
+                "date": sched.get("date", ""),
+                "meal_time": sched.get("meal_time", "Dinner"),
+                "recipe_url": library_entry.get("recipe_url", "") if library_entry else "",
+                "notes": library_entry.get("notes", "") if library_entry else "",
+                "potential": sched.get("potential", False),
+            }
+            merged_scheduled.append(merged_meal)
+
+        # Build library list with unique names for frontend
+        unique_library = []
+        seen_names = set()
+        for lib in data.get("library", []):
+            name = lib.get("name", "").lower()
+            if name and name not in seen_names:
+                seen_names.add(name)
+                unique_library.append({
+                    "name": lib.get("name", ""),
+                    "recipe_url": lib.get("recipe_url", ""),
+                    "notes": lib.get("notes", "")
+                })
+
         connection.send_result(msg["id"], {
             "settings": data.get("settings", {"week_start": "Sunday"}),
-            "scheduled": data.get("scheduled", []),  # Returns list of meal objects
-            "library": data.get("library", []),
+            "scheduled": merged_scheduled,
+            "library": unique_library,
         })
 
     @websocket_api.websocket_command({
