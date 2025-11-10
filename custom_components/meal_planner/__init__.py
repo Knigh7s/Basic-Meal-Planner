@@ -783,24 +783,36 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # ---------- Register Custom Lovelace Cards ----------
     cards_dir = Path(__file__).parent / "www"
+    # Disable caching for card JavaScript files to prevent stale cache issues
     await hass.http.async_register_static_paths(
         [
             StaticPathConfig(
                 url_path="/meal_planner",
                 path=str(cards_dir),
-                cache_headers=False,
+                cache_headers=False,  # Disable browser caching
             )
         ]
     )
 
     # Auto-register cards in frontend (no manual resource registration needed!)
+    # Add version parameter for cache busting
     from homeassistant.components.frontend import add_extra_js_url
+    import json
 
-    add_extra_js_url(hass, "/meal_planner/meal-planner-weekly-horizontal.js")
-    add_extra_js_url(hass, "/meal_planner/meal-planner-weekly-vertical.js")
-    add_extra_js_url(hass, "/meal_planner/meal-planner-potential-meals.js")
+    manifest_path = Path(__file__).parent / "manifest.json"
+    version = "0.2.0"  # default
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+            version = manifest.get("version", version)
+    except Exception:
+        pass
 
-    _LOGGER.info("Meal Planner: custom cards auto-registered and served from %s", cards_dir)
+    add_extra_js_url(hass, f"/meal_planner/meal-planner-weekly-horizontal.js?v={version}")
+    add_extra_js_url(hass, f"/meal_planner/meal-planner-weekly-vertical.js?v={version}")
+    add_extra_js_url(hass, f"/meal_planner/meal-planner-potential-meals.js?v={version}")
+
+    _LOGGER.info("Meal Planner: custom cards auto-registered (v%s) and served from %s", version, cards_dir)
 
     _LOGGER.info("=" * 80)
     _LOGGER.info("MEAL PLANNER: async_setup_entry completed successfully!")
