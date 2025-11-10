@@ -436,20 +436,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         vol.Optional("potential"): bool,
     })
     async def ws_update(hass, connection, msg):
-        _LOGGER.info("WS update called with msg: %s", msg)
-        payload = {
-            "row_id": msg.get("row_id", ""),
-        }
-        for k in ("name", "meal_time", "date", "recipe_url", "notes"):
-            if k in msg:
-                payload[k] = msg.get(k, "")
-        if "potential" in msg:
-            payload["potential"] = msg.get("potential", False)
+        try:
+            _LOGGER.info("=" * 80)
+            _LOGGER.info("WS UPDATE CALLED!")
+            _LOGGER.info("Message: %s", msg)
+            _LOGGER.info("=" * 80)
 
-        _LOGGER.info("Calling update service with payload: %s", payload)
-        await hass.services.async_call(DOMAIN, "update", payload)
-        _LOGGER.info("Update service completed, sending result")
-        connection.send_result(msg["id"], {"success": True})
+            payload = {
+                "row_id": msg.get("row_id", ""),
+            }
+            for k in ("name", "meal_time", "date", "recipe_url", "notes"):
+                if k in msg:
+                    payload[k] = msg.get(k, "")
+            if "potential" in msg:
+                payload["potential"] = msg.get("potential", False)
+
+            _LOGGER.info("Calling update service with payload: %s", payload)
+            await hass.services.async_call(DOMAIN, "update", payload)
+            _LOGGER.info("Update service completed, sending result")
+            connection.send_result(msg["id"], {"success": True})
+        except Exception as e:
+            _LOGGER.error("WS UPDATE ERROR: %s", e, exc_info=True)
+            connection.send_error(msg["id"], "update_failed", str(e))
 
     @websocket_api.websocket_command({
         vol.Required("type"): f"{DOMAIN}/bulk",
@@ -482,12 +490,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await hass.services.async_call(DOMAIN, "update_settings", settings_data)
         connection.send_result(msg["id"], {"success": True})
 
+    # Test command - simple ping
+    @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/ping"})
+    @callback
+    def ws_ping(hass, connection, msg):
+        _LOGGER.info("PING RECEIVED!")
+        connection.send_result(msg["id"], {"pong": True})
+
     _LOGGER.info("Registering websocket commands")
-    websocket_api.async_register_command(hass, ws_get)
-    websocket_api.async_register_command(hass, ws_add)
-    websocket_api.async_register_command(hass, ws_update)
-    websocket_api.async_register_command(hass, ws_bulk)
-    websocket_api.async_register_command(hass, ws_update_settings)
+    try:
+        websocket_api.async_register_command(hass, ws_ping)
+        _LOGGER.info("Registered: ping")
+        websocket_api.async_register_command(hass, ws_get)
+        _LOGGER.info("Registered: get")
+        websocket_api.async_register_command(hass, ws_add)
+        _LOGGER.info("Registered: add")
+        websocket_api.async_register_command(hass, ws_update)
+        _LOGGER.info("Registered: update")
+        websocket_api.async_register_command(hass, ws_bulk)
+        _LOGGER.info("Registered: bulk")
+        websocket_api.async_register_command(hass, ws_update_settings)
+        _LOGGER.info("Registered: update_settings")
+    except Exception as e:
+        _LOGGER.error("Failed to register websocket commands: %s", e, exc_info=True)
     _LOGGER.info("Websocket commands registered successfully")
 
     # ---------- Serve static admin panel (no cache) ----------

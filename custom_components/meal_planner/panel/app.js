@@ -99,28 +99,43 @@ class MealPlannerApp {
   async callService(type, data = {}) {
     console.log('[Meal Planner] callService called with:', { type, data });
 
-    // Use WebSocket API if available
-    if (this.hass && this.hass.callWS && !this.hass.useFetchAPI) {
-      console.log('[Meal Planner] Using WebSocket API');
+    // Use Home Assistant service API directly (more reliable than WebSocket)
+    if (this.hass && this.hass.callService) {
+      console.log('[Meal Planner] Using Service API');
+
+      // Map WebSocket command types to service names
+      const serviceMap = {
+        'meal_planner/get': null, // GET still uses WebSocket
+        'meal_planner/add': 'add',
+        'meal_planner/update': 'update',
+        'meal_planner/bulk': 'bulk',
+        'meal_planner/update_settings': 'update_settings'
+      };
+
+      const serviceName = serviceMap[type];
+
+      if (serviceName) {
+        console.log('[Meal Planner] Calling service: meal_planner.' + serviceName);
+        try {
+          await this.hass.callService('meal_planner', serviceName, data);
+          console.log('[Meal Planner] Service call succeeded');
+          return { success: true };
+        } catch (error) {
+          console.error('[Meal Planner] Service call failed:', error);
+          throw error;
+        }
+      }
+    }
+
+    // Fallback to WebSocket for GET command
+    if (this.hass && this.hass.callWS && type === 'meal_planner/get') {
+      console.log('[Meal Planner] Using WebSocket API for GET');
       try {
-        // Add timeout
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('WebSocket timeout after 10s')), 10000)
-        );
-
-        const wsPayload = { type, ...data };
-        console.log('[Meal Planner] Sending WebSocket payload:', wsPayload);
-        console.log('[Meal Planner] Payload keys:', Object.keys(wsPayload));
-        const wsPromise = this.hass.callWS(wsPayload);
-
-        const result = await Promise.race([wsPromise, timeoutPromise]);
+        const result = await this.hass.callWS({ type });
         console.log('[Meal Planner] WebSocket result:', result);
         return result;
       } catch (error) {
         console.error('[Meal Planner] WebSocket call failed:', error);
-        console.error('[Meal Planner] Error type:', error.constructor.name);
-        console.error('[Meal Planner] Error message:', error.message);
-        if (error.code) console.error('[Meal Planner] Error code:', error.code);
         throw error;
       }
     }
