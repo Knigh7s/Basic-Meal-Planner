@@ -154,58 +154,143 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.info("MEAL PLANNER: Starting async_setup_entry")
     _LOGGER.info("=" * 80)
 
-    # Load data - Read the file directly to bypass Store key matching issues
+    # New structure: 3 separate files
     import json
-    storage_path = Path(hass.config.path(".storage")) / STORAGE_DIR / STORAGE_FILE
-    _LOGGER.info("Attempting to load data from: %s", storage_path)
+    from homeassistant.util import json as hass_json
 
-    # Still create Store for saving later
-    store = Store(hass, 1, f"{STORAGE_DIR}/{STORAGE_FILE.replace('.json', '')}")
+    storage_base = Path(hass.config.path(".storage")) / STORAGE_DIR
+    library_path = storage_base / "meal_library.json"
+    scheduled_path = storage_base / "scheduled.json"
+    settings_path = storage_base / "settings.json"
+    old_path = storage_base / STORAGE_FILE  # meals.json for migration
 
-    data = None
-    if storage_path.exists():
+    # Ensure directory exists
+    storage_base.mkdir(parents=True, exist_ok=True)
+
+    # Initialize data structure
+    data = {
+        "library": [],     # List of {id, name, recipe_url, notes}
+        "scheduled": [],   # List of {id, library_id, date, meal_time, potential}
+        "settings": {"week_start": "Sunday", "days_after_today": 3}
+    }
+
+    # Try loading new format first
+    needs_migration = False
+    if library_path.exists() and scheduled_path.exists():
+        _LOGGER.info("Loading from new 3-file structure")
         try:
-            with open(storage_path, "r", encoding="utf-8") as f:
-                file_contents = json.load(f)
-                # Store files wrap data in a "data" key
-                if "data" in file_contents:
-                    data = file_contents["data"]
-                    _LOGGER.info("Loaded data from file successfully")
-                else:
-                    data = file_contents
-                    _LOGGER.warning("File doesn't have 'data' wrapper, using raw contents")
+            def load_json_file(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+
+            data["library"] = await hass.async_add_executor_job(load_json_file, library_path)
+            data["scheduled"] = await hass.async_add_executor_job(load_json_file, scheduled_path)
+            if settings_path.exists():
+                data["settings"] = await hass.async_add_executor_job(load_json_file, settings_path)
+
+            _LOGGER.info("Loaded: %d library meals, %d scheduled", len(data["library"]), len(data["scheduled"]))
         except Exception as e:
-            _LOGGER.error("Failed to read meals.json: %s", e)
-            data = None
+            _LOGGER.error("Failed to load new structure: %s", e, exc_info=True)
+            needs_migration = True
     else:
-        _LOGGER.warning("File does not exist at: %s", storage_path)
+        needs_migration = True
 
-    if not isinstance(data, dict):
-        _LOGGER.warning("Data is not a dict, using defaults. Type was: %s", type(data))
-        data = DEFAULT_DATA.copy()
+    # Migration from old format
+    if needs_migration and old_path.exists():
+        _LOGGER.info("Migrating from old meals.json format...")
+        try:
+            def load_old_data(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    contents = json.load(f)
+                    return contents.get("data", contents) if "data" in contents else contents
 
-    _LOGGER.info("Data keys: %s", list(data.keys()) if data else "None")
-    _LOGGER.info("Scheduled count: %s", len(data.get("scheduled", [])))
-    _LOGGER.info("Library count: %s", len(data.get("library", [])))
+            old_data = await hass.async_add_executor_job(load_old_data, old_path)
 
-    # Normalize
-    data.setdefault("settings", {"week_start": "Sunday", "days_after_today": 3})
-    data.setdefault("scheduled", [])
-    data.setdefault("library", [])
-    # Ensure days_after_today exists in settings
-    if "days_after_today" not in data["settings"]:
-        data["settings"]["days_after_today"] = 3
+            # Migrate settings
+            data["settings"] = old_data.get("settings", data["settings"])
+
+            # Migrate library - extract unique meals by name
+            old_library = old_data.get("library", [])
+            library_map = {}  # name -> library entry
+            for lib_meal in old_library:
+                name = lib_meal.get("name", "").strip()
+                if name and name not in library_map:
+                    library_map[name] = {
+                        "id": uuid.uuid4().hex,
+                        "name": name,
+                        "recipe_url": lib_meal.get("recipe_url", ""),
+                        "notes": lib_meal.get("notes", "")
+                    }
+
+            # Migrate scheduled - create library entries for any unique meals
+            old_scheduled = old_data.get("scheduled", [])
+            for sched_meal in old_scheduled:
+                name = sched_meal.get("name", "").strip()
+                if name and name not in library_map:
+                    # Create library entry from scheduled meal
+                    library_map[name] = {
+                        "id": uuid.uuid4().hex,
+                        "name": name,
+                        "recipe_url": sched_meal.get("recipe_url", ""),
+                        "notes": sched_meal.get("notes", "")
+                    }
+
+            data["library"] = list(library_map.values())
+
+            # Convert scheduled to references
+            for sched_meal in old_scheduled:
+                name = sched_meal.get("name", "").strip()
+                if name in library_map:
+                    data["scheduled"].append({
+                        "id": sched_meal.get("id", uuid.uuid4().hex),
+                        "library_id": library_map[name]["id"],
+                        "date": sched_meal.get("date", ""),
+                        "meal_time": sched_meal.get("meal_time", "Dinner"),
+                        "potential": sched_meal.get("potential", False)
+                    })
+
+            _LOGGER.info("Migration complete: %d library, %d scheduled", len(data["library"]), len(data["scheduled"]))
+
+            # Save in new format
+            def save_json_file(path, content):
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(content, f, indent=2, ensure_ascii=False)
+
+            await hass.async_add_executor_job(save_json_file, library_path, data["library"])
+            await hass.async_add_executor_job(save_json_file, scheduled_path, data["scheduled"])
+            await hass.async_add_executor_job(save_json_file, settings_path, data["settings"])
+
+            # Backup old file
+            backup_path = storage_base / "meals.json.backup"
+            await hass.async_add_executor_job(lambda: old_path.rename(backup_path))
+            _LOGGER.info("Backed up old meals.json to meals.json.backup")
+
+        except Exception as e:
+            _LOGGER.error("Migration failed: %s", e, exc_info=True)
+            data = DEFAULT_DATA.copy()
+
+    _LOGGER.info("Final data: Library=%d, Scheduled=%d", len(data["library"]), len(data["scheduled"]))
+
+    # Normalize - ensure IDs exist
+    for m in data["library"]:
+        m.setdefault("id", uuid.uuid4().hex)
     for m in data["scheduled"]:
         m.setdefault("id", uuid.uuid4().hex)
-        m.setdefault("recipe_url", "")
-        m.setdefault("notes", "")
+        m.setdefault("library_id", "")
         m.setdefault("meal_time", "Dinner")
         m.setdefault("date", "")
         m.setdefault("potential", False)
 
-    # Save handles
+    # Save handles and paths
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN].update({"store": store, "data": data})
+    hass.data[DOMAIN].update({
+        "data": data,
+        "paths": {
+            "library": library_path,
+            "scheduled": scheduled_path,
+            "settings": settings_path
+        }
+    })
 
     # Clean up any duplicate/old entity registrations
     from homeassistant.helpers import entity_registry as er
@@ -222,30 +307,33 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Forward to sensor platform
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
 
-    async def _save_and_notify():
-        # Save directly to file (not using Store to avoid key mismatch issues)
+    async def _save_and_notify(save_library=False, save_scheduled=False, save_settings=False):
+        # Save to appropriate files based on what changed
         import json
-        from homeassistant.util import json as hass_json
+
+        def save_json_file(path, content):
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(content, f, indent=2, ensure_ascii=False)
+
+        paths = hass.data[DOMAIN]["paths"]
 
         try:
-            # Wrap data in Store format
-            file_data = {
-                "version": 1,
-                "minor_version": 1,
-                "key": ".storage/meal_planner/meals.json",  # Keep original key
-                "data": data
-            }
+            if save_library:
+                await hass.async_add_executor_job(save_json_file, paths["library"], data["library"])
+                _LOGGER.info("Library saved: %d meals", len(data["library"]))
 
-            # Write atomically using Home Assistant's helper
-            await hass.async_add_executor_job(
-                hass_json.save_json,
-                str(storage_path),
-                file_data
-            )
-            _LOGGER.info("Data saved successfully to %s", storage_path)
+            if save_scheduled:
+                await hass.async_add_executor_job(save_json_file, paths["scheduled"], data["scheduled"])
+                _LOGGER.info("Scheduled saved: %d entries", len(data["scheduled"]))
+
+            if save_settings:
+                await hass.async_add_executor_job(save_json_file, paths["settings"], data["settings"])
+                _LOGGER.info("Settings saved")
+
         except Exception as e:
             _LOGGER.error("Failed to save data: %s", e, exc_info=True)
 
+        # Update sensors
         sensors = hass.data[DOMAIN].get("sensors", {})
         if "potential" in sensors:
             await sensors["potential"].async_update_from_data()
