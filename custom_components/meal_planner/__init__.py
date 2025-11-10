@@ -154,13 +154,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.info("MEAL PLANNER: Starting async_setup_entry")
     _LOGGER.info("=" * 80)
 
-    # Ensure storage dir
-    store_dir = Path(hass.config.path(STORAGE_DIR))
-    store_dir.mkdir(parents=True, exist_ok=True)
-    _LOGGER.info("Storage dir created/verified: %s", store_dir)
-
-    # Load data
-    store = Store(hass, 1, f"{STORAGE_DIR}/{STORAGE_FILE}")
+    # Load data - Store class automatically handles .storage directory
+    # Store will create the file at: .storage/meal_planner_meals
+    store = Store(hass, 1, "meal_planner_meals")
     data = await store.async_load()
     if not isinstance(data, dict):
         data = DEFAULT_DATA.copy()
