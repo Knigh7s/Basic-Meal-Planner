@@ -150,9 +150,14 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 # -------------------
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    _LOGGER.info("=" * 80)
+    _LOGGER.info("MEAL PLANNER: Starting async_setup_entry")
+    _LOGGER.info("=" * 80)
+
     # Ensure storage dir
     store_dir = Path(hass.config.path(STORAGE_DIR))
     store_dir.mkdir(parents=True, exist_ok=True)
+    _LOGGER.info("Storage dir created/verified: %s", store_dir)
 
     # Load data
     store = Store(hass, 1, f"{STORAGE_DIR}/{STORAGE_FILE}")
@@ -365,6 +370,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.services.async_register(DOMAIN, "update_settings", svc_update_settings)
 
     # ---------- WebSocket commands (register BEFORE returning) ----------
+    _LOGGER.info("About to register WebSocket commands...")
     from homeassistant.components import websocket_api
 
     @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/get"})
@@ -522,6 +528,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     _LOGGER.info("Meal Planner: custom cards auto-registered and served from %s", cards_dir)
 
+    _LOGGER.info("=" * 80)
+    _LOGGER.info("MEAL PLANNER: async_setup_entry completed successfully!")
+    _LOGGER.info("=" * 80)
     return True
 
 
