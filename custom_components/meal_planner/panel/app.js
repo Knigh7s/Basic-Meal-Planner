@@ -462,12 +462,6 @@ class MealPlannerApp {
         this.togglePotential(libData.library_id, !libData.potential);
       }
 
-      // Schedule a library meal (opens modal pre-filled with name/recipe/notes)
-      if (target.classList.contains('schedule-library-btn') || target.closest('.schedule-library-btn')) {
-        const btn = target.classList.contains('schedule-library-btn') ? target : target.closest('.schedule-library-btn');
-        const libData = JSON.parse(btn.getAttribute('data-lib'));
-        this.openScheduleFromLibraryModal(libData);
-      }
     });
   }
 
@@ -642,8 +636,7 @@ class MealPlannerApp {
       html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td>
         <button class="${starClass} toggle-potential-btn" data-lib='${this.escapeHtml(libData)}' title="${starTitle}">⭐</button>
-        <button class="schedule-library-btn btn-secondary" data-lib='${this.escapeHtml(libData)}' title="Schedule this meal">📅 Schedule</button>
-        <button class="edit-library-btn btn-primary" data-lib='${this.escapeHtml(libData)}'>Edit</button>
+        <button class="edit-library-btn btn-primary" data-lib='${this.escapeHtml(libData)}'>✏️ Edit</button>
         <button class="delete-library-meal-btn btn-danger" data-lib='${this.escapeHtml(libData)}'>🗑️ Delete</button>
       </td>`;
       html += '</tr>';
@@ -667,33 +660,7 @@ class MealPlannerApp {
     }
   }
 
-  openScheduleFromLibraryModal(libData) {
-    this.editingLibraryId = null;
-    this.editingMeal = null; // ensures handleFormSubmit calls addMeal
-
-    // Restore any hidden fields
-    document.getElementById('meal-date').closest('.form-group').style.display = '';
-    document.getElementById('meal-time').closest('.form-group').style.display = '';
-
-    const modal = document.getElementById('meal-modal');
-    const form = document.getElementById('meal-form');
-    const title = document.getElementById('modal-title');
-
-    form.reset();
-    title.textContent = 'Schedule Meal';
-
-    // Pre-fill name and recipe/notes from library; leave date/time for user to pick
-    document.getElementById('meal-name').value = libData.name || '';
-    document.getElementById('meal-date').value = '';
-    document.getElementById('meal-time').value = 'Dinner';
-    document.getElementById('meal-recipe').value = libData.recipe_url || '';
-    document.getElementById('meal-notes').value = libData.notes || '';
-
-    modal.classList.remove('hidden');
-  }
-
   openLibraryEditModal(libData) {
-    // Reuse the meal modal but only for name/recipe/notes (library-only edit)
     const modal = document.getElementById('meal-modal');
     const form = document.getElementById('meal-form');
     const title = document.getElementById('modal-title');
@@ -702,14 +669,16 @@ class MealPlannerApp {
     this.editingMeal = null;
     this.editingLibraryId = libData.library_id;
 
-    title.textContent = 'Edit Library Entry';
+    // Ensure all fields are visible
+    document.getElementById('meal-date').closest('.form-group').style.display = '';
+    document.getElementById('meal-time').closest('.form-group').style.display = '';
+
+    title.textContent = 'Edit Meal';
     document.getElementById('meal-name').value = libData.name || '';
+    document.getElementById('meal-date').value = '';
+    document.getElementById('meal-time').value = 'Dinner';
     document.getElementById('meal-recipe').value = libData.recipe_url || '';
     document.getElementById('meal-notes').value = libData.notes || '';
-
-    // Hide schedule-specific fields — not relevant when editing a library entry
-    document.getElementById('meal-date').closest('.form-group').style.display = 'none';
-    document.getElementById('meal-time').closest('.form-group').style.display = 'none';
 
     modal.classList.remove('hidden');
   }
@@ -794,12 +763,16 @@ class MealPlannerApp {
       let success = false;
 
       if (this.editingLibraryId) {
-        // Editing a library entry directly (from Meals Library view)
+        // Update library entry (name/recipe/notes)
         success = await this.updateLibraryEntry(this.editingLibraryId, {
           name,
           recipe_url: recipe || '',
           notes: notes || ''
         });
+        // If a date was also provided, create a scheduled entry
+        if (success && date) {
+          success = await this.addMeal({ name, date, meal_time: mealTime, recipe_url: recipe || '', notes: notes || '' });
+        }
       } else if (this.editingMeal && this.editingMeal.id) {
         // Update an existing scheduled entry
         success = await this.updateMeal(this.editingMeal.id, mealData);
