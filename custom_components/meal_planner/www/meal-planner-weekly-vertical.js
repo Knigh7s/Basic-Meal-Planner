@@ -101,6 +101,13 @@ class MealPlannerWeeklyVertical extends HTMLElement {
         if (!hasMeals) {
           html += `<div class="no-meals">No meals planned</div>`;
         }
+      } else {
+        const mealNames = mealTimes.map(mt => dayData[mt] || '').filter(m => m.trim());
+        if (mealNames.length > 0) {
+          html += `<div class="meals-compact">${mealNames.map(m => this.escapeHtml(m)).join(' · ')}</div>`;
+        } else {
+          html += `<div class="no-meals">No meals planned</div>`;
+        }
       }
 
       html += `</div>`;
@@ -251,6 +258,17 @@ class MealPlannerWeeklyVertical extends HTMLElement {
         color: rgba(255, 255, 255, 0.8);
       }
 
+      .meal-planner-vertical-card .meals-compact {
+        font-size: 0.88em;
+        color: var(--primary-text-color, #fff);
+        line-height: 1.4;
+        padding: 2px 0;
+      }
+
+      .meal-planner-vertical-card .day-row.today .meals-compact {
+        color: #fff;
+      }
+
       .meal-planner-vertical-card .no-meals {
         font-size: 0.85em;
         color: var(--secondary-text-color, #666);
@@ -337,7 +355,7 @@ if (!window.customCards.find(c => c.type === 'meal-planner-weekly-vertical')) {
 }
 
 console.info(
-  '%c MEAL-PLANNER-WEEKLY-VERTICAL %c v0.1.1 ',
+  '%c MEAL-PLANNER-WEEKLY-VERTICAL %c v0.1.2 ',
   'color: white; background: green; font-weight: 700;',
   'color: green; background: white; font-weight: 700;'
 );
