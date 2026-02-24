@@ -461,6 +461,13 @@ class MealPlannerApp {
         const libData = JSON.parse(btn.getAttribute('data-lib'));
         this.togglePotential(libData.library_id, !libData.potential);
       }
+
+      // Schedule a library meal (opens modal pre-filled with name/recipe/notes)
+      if (target.classList.contains('schedule-library-btn') || target.closest('.schedule-library-btn')) {
+        const btn = target.classList.contains('schedule-library-btn') ? target : target.closest('.schedule-library-btn');
+        const libData = JSON.parse(btn.getAttribute('data-lib'));
+        this.openScheduleFromLibraryModal(libData);
+      }
     });
   }
 
@@ -590,8 +597,6 @@ class MealPlannerApp {
     // Filter by potential status
     if (filterValue === 'potential') {
       meals = meals.filter(meal => meal.potential === true);
-    } else if (filterValue === 'planned') {
-      meals = meals.filter(meal => !meal.potential);
     }
 
     if (meals.length === 0) {
@@ -629,7 +634,7 @@ class MealPlannerApp {
       const isPotential = meal.potential === true;
       const rowClass = isPotential ? ' class="potential-row"' : '';
       const starClass = isPotential ? 'btn-potential btn-potential-active' : 'btn-potential';
-      const starTitle = isPotential ? 'Mark as planned' : 'Mark as potential';
+      const starTitle = isPotential ? 'Remove Potential Meal' : 'Mark as a Potential Meal';
 
       html += `<tr${rowClass}>`;
       html += `<td>${this.escapeHtml(meal.name)}</td>`;
@@ -637,6 +642,7 @@ class MealPlannerApp {
       html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td>
         <button class="${starClass} toggle-potential-btn" data-lib='${this.escapeHtml(libData)}' title="${starTitle}">⭐</button>
+        <button class="schedule-library-btn btn-secondary" data-lib='${this.escapeHtml(libData)}' title="Schedule this meal">📅 Schedule</button>
         <button class="edit-library-btn btn-primary" data-lib='${this.escapeHtml(libData)}'>Edit</button>
         <button class="delete-library-meal-btn btn-danger" data-lib='${this.escapeHtml(libData)}'>🗑️ Delete</button>
       </td>`;
@@ -659,6 +665,31 @@ class MealPlannerApp {
       console.error('[Meal Planner] Failed to toggle potential:', error);
       await this.showAlert('Failed to update potential status. Please try again.');
     }
+  }
+
+  openScheduleFromLibraryModal(libData) {
+    this.editingLibraryId = null;
+    this.editingMeal = null; // ensures handleFormSubmit calls addMeal
+
+    // Restore any hidden fields
+    document.getElementById('meal-date').closest('.form-group').style.display = '';
+    document.getElementById('meal-time').closest('.form-group').style.display = '';
+
+    const modal = document.getElementById('meal-modal');
+    const form = document.getElementById('meal-form');
+    const title = document.getElementById('modal-title');
+
+    form.reset();
+    title.textContent = 'Schedule Meal';
+
+    // Pre-fill name and recipe/notes from library; leave date/time for user to pick
+    document.getElementById('meal-name').value = libData.name || '';
+    document.getElementById('meal-date').value = '';
+    document.getElementById('meal-time').value = 'Dinner';
+    document.getElementById('meal-recipe').value = libData.recipe_url || '';
+    document.getElementById('meal-notes').value = libData.notes || '';
+
+    modal.classList.remove('hidden');
   }
 
   openLibraryEditModal(libData) {
