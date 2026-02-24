@@ -912,17 +912,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.info("Websocket commands registered successfully")
 
     # ---------- Serve static admin panel (no cache) ----------
+    # NOTE: url_path must differ from frontend_url_path ("meal-planner") to avoid
+    # a 403 on refresh — HA's HTTP server would intercept the directory request
+    # before the frontend JS can handle the route.
     panel_dir = Path(__file__).parent / "panel"
     await hass.http.async_register_static_paths(
         [
             StaticPathConfig(
-                url_path="/meal-planner",
+                url_path="/meal-planner-panel",
                 path=str(panel_dir),
                 cache_headers=False,  # avoid stale JS/CSS after HACS updates
             )
         ]
     )
-    _LOGGER.info("Meal Planner: static panel served at /meal-planner from %s", panel_dir)
+    _LOGGER.info("Meal Planner: static panel served at /meal-planner-panel from %s", panel_dir)
 
     # ---------- Sidebar Panel ----------
     panel_id = "meal-planner"
@@ -942,7 +945,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 sidebar_title="Meal Planner",
                 sidebar_icon="mdi:silverware-fork-knife",
                 frontend_url_path=panel_id,
-                config={"url": "/meal-planner/index.html"},
+                config={"url": "/meal-planner-panel/index.html"},
                 require_admin=False,
             )
             _LOGGER.info("Meal Planner: iframe panel '%s' registered", panel_id)
