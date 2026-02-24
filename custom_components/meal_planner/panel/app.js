@@ -462,6 +462,14 @@ class MealPlannerApp {
         this.togglePotential(libData.library_id, !libData.potential);
       }
 
+      // Open recipe link (companion app compatible — window.top breaks out of iframe)
+      if (target.classList.contains('recipe-link') || target.closest('.recipe-link')) {
+        e.preventDefault();
+        const link = target.classList.contains('recipe-link') ? target : target.closest('.recipe-link');
+        const url = link.dataset.url;
+        if (url) window.top.open(url, '_blank', 'noopener noreferrer');
+      }
+
     });
   }
 
@@ -558,7 +566,7 @@ class MealPlannerApp {
       html += `<td>${this.formatDate(meal.date)}</td>`;
       html += `<td><span class="badge badge-secondary">${this.capitalize(meal.meal_time)}</span></td>`;
       html += `<td>${this.escapeHtml(meal.name)}</td>`;
-      html += `<td>${meal.recipe_url ? `<a href="${this.escapeHtml(meal.recipe_url)}" target="_blank">View Recipe</a>` : '-'}</td>`;
+      html += `<td>${meal.recipe_url ? `<a href="#" class="recipe-link" data-url="${this.escapeHtml(meal.recipe_url)}">View Recipe</a>` : '-'}</td>`;
       html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td>
         <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}'>✏️ Edit</button>
@@ -632,7 +640,7 @@ class MealPlannerApp {
 
       html += `<tr${rowClass}>`;
       html += `<td>${this.escapeHtml(meal.name)}</td>`;
-      html += `<td>${meal.recipe_url ? `<a href="${this.escapeHtml(meal.recipe_url)}" target="_blank">View Recipe</a>` : '-'}</td>`;
+      html += `<td>${meal.recipe_url ? `<a href="#" class="recipe-link" data-url="${this.escapeHtml(meal.recipe_url)}">View Recipe</a>` : '-'}</td>`;
       html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td>
         <button class="${starClass} toggle-potential-btn" data-lib='${this.escapeHtml(libData)}' title="${starTitle}">⭐</button>
