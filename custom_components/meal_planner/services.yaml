@@ -32,11 +32,6 @@ add:
       example: "Use gluten-free pasta"
       selector:
         text:
-    potential:
-      required: false
-      example: false
-      selector:
-        boolean:
 
 update:
   name: Update meal
@@ -77,11 +72,6 @@ update:
       example: "Use gluten-free pasta"
       selector:
         text:
-    potential:
-      required: false
-      example: false
-      selector:
-        boolean:
 
 update_settings:
   name: Update settings
@@ -151,7 +141,7 @@ promote_future_to_week:
 
 update_library:
   name: Update library entry
-  description: Update a library entry's name, recipe URL, or notes by its library ID.
+  description: Update a library entry's name, recipe URL, notes, or potential flag by its library ID.
   fields:
     library_id:
       required: true
@@ -173,6 +163,11 @@ update_library:
       example: "Use gluten-free pasta"
       selector:
         text:
+    potential:
+      required: false
+      example: true
+      selector:
+        boolean:
 
 delete_library:
   name: Delete library entry

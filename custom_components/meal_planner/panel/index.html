@@ -45,10 +45,6 @@
         <span class="tab-icon">📚</span>
         <span class="tab-label">Meals Library</span>
       </a>
-      <a href="#potential" class="nav-tab" data-view="potential">
-        <span class="tab-icon">💡</span>
-        <span class="tab-label">Potential Meals</span>
-      </a>
     </nav>
 
     <!-- Views Container -->
@@ -75,6 +71,11 @@
             <div class="search-box">
               <input type="search" id="search-meals" placeholder="Search meals...">
             </div>
+            <select id="library-filter" class="library-filter-select">
+              <option value="all">All Meals</option>
+              <option value="potential">⭐ Potential Only</option>
+              <option value="planned">Planned Only</option>
+            </select>
             <button id="add-meal-library-btn" class="btn-primary">+ Add Meal</button>
           </div>
         </div>
@@ -83,15 +84,6 @@
         </div>
       </div>
 
-      <!-- Potential Meals View -->
-      <div id="potential-view" class="view">
-        <div class="view-header">
-          <h1>Potential Meals</h1>
-        </div>
-        <div class="view-content">
-          <div id="potential-content"></div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -134,14 +126,6 @@
           <div class="form-group">
             <label for="meal-notes">Notes</label>
             <textarea id="meal-notes" rows="3" maxlength="500"></textarea>
-          </div>
-
-          <div class="form-group">
-            <label class="checkbox-label">
-              <input type="checkbox" id="meal-potential">
-              <span>Mark as Potential (idea to track for future)</span>
-            </label>
-            <small>Potential meals appear in the Potential Meals tab</small>
           </div>
 
           <div class="modal-actions">

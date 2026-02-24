@@ -160,6 +160,43 @@ def _purge_old_scheduled(data: dict) -> int:
     return removed
 
 
+def _migrate_potential_to_library(data: dict) -> bool:
+    """Move the potential flag from scheduled entries into library entries.
+
+    - Library entries with no potential field get potential=False.
+    - Scheduled entries with potential=True OR with no date are removed from
+      scheduled; their library entry gets potential=True.
+    - Any leftover 'potential' key on normal scheduled entries is stripped.
+    Returns True if anything was modified.
+    """
+    changed = False
+    library_map = {lib.get("id"): lib for lib in data.get("library", [])}
+
+    for lib in data.get("library", []):
+        if "potential" not in lib:
+            lib["potential"] = False
+            changed = True
+
+    keep_scheduled = []
+    for m in data.get("scheduled", []):
+        is_potential = m.get("potential", False)
+        has_no_date = not (m.get("date") or "").strip()
+
+        if is_potential or has_no_date:
+            lib_entry = library_map.get(m.get("library_id"))
+            if lib_entry is not None:
+                lib_entry["potential"] = True
+            changed = True
+        else:
+            if "potential" in m:
+                del m["potential"]
+                changed = True
+            keep_scheduled.append(m)
+
+    data["scheduled"] = keep_scheduled
+    return changed
+
+
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     return True
 
@@ -192,7 +229,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Initialize data structure
     data = {
         "library": [],     # List of {id, name, recipe_url, notes}
-        "scheduled": [],   # List of {id, library_id, date, meal_time, potential}
+        "scheduled": [],   # List of {id, library_id, date, meal_time}
         "settings": {"week_start": "Sunday", "days_after_today": 3, "days_to_keep": 14}
     }
 
@@ -293,15 +330,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     _LOGGER.info("Final data: Library=%d, Scheduled=%d", len(data["library"]), len(data["scheduled"]))
 
-    # Normalize - ensure IDs exist
+    # Normalize - ensure IDs exist and fields are present
     for m in data["library"]:
         m.setdefault("id", uuid.uuid4().hex)
+        m.setdefault("potential", False)
     for m in data["scheduled"]:
         m.setdefault("id", uuid.uuid4().hex)
         m.setdefault("library_id", "")
         m.setdefault("meal_time", "Dinner")
         m.setdefault("date", "")
-        m.setdefault("potential", False)
+        m.pop("potential", None)  # potential lives on library entry now
 
     # Save handles and paths
     hass.data.setdefault(DOMAIN, {})
@@ -368,6 +406,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if _startup_purged > 0:
         await _save_and_notify(save_scheduled=True)
 
+    # Migrate potential flag from scheduled → library (one-time, idempotent)
+    _migration_changed = _migrate_potential_to_library(data)
+    if _migration_changed:
+        _LOGGER.info("Migrated potential flag from scheduled entries to library entries")
+        await _save_and_notify(save_library=True, save_scheduled=True)
+
     # ---------- Services ----------
     async def svc_add(call: ServiceCall):
         """Add a meal - creates library entry and scheduled entry."""
@@ -396,7 +440,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "id": uuid.uuid4().hex,
                 "name": name,
                 "recipe_url": recipe_url,
-                "notes": notes
+                "notes": notes,
+                "potential": False,
             }
             data["library"].append(library_entry)
             if len(data["library"]) > MAX_LIBRARY_SIZE:
@@ -412,15 +457,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             validated_date = _validate_date(date_str)
             date_str = validated_date if validated_date else ""
 
-        potential = call.data.get("potential", False)
+        if not date_str:
+            # No date — mark as potential in library; no scheduled entry needed
+            library_entry["potential"] = True
+            await _save_and_notify(save_library=True)
+            return
 
-        # Create scheduled entry
+        # Has a valid date — create scheduled entry and mark library as non-potential
+        library_entry["potential"] = False
         data["scheduled"].append({
             "id": uuid.uuid4().hex,
             "library_id": library_entry["id"],
             "meal_time": meal_time,
             "date": date_str,
-            "potential": potential,
         })
 
         # Enforce limits
@@ -519,10 +568,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 scheduled_entry["date"] = ""
             save_scheduled = True
 
-        if "potential" in call.data:
-            scheduled_entry["potential"] = bool(call.data.get("potential", False))
-            save_scheduled = True
-
         if save_library or save_scheduled:
             await _save_and_notify(save_library=save_library, save_scheduled=save_scheduled)
 
@@ -549,6 +594,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         idset = set(ids)
         new_list = []
         deleted_library_ids = set()
+        library_map_by_id = {lib.get("id"): lib for lib in data.get("library", [])}
 
         for m in data["scheduled"]:
             if m["id"] not in idset:
@@ -556,8 +602,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 continue
 
             if action == "convert_to_potential":
-                m["date"] = ""
-                new_list.append(m)
+                # Mark library entry as potential and drop the scheduled entry
+                lib_entry = library_map_by_id.get(m.get("library_id"))
+                if lib_entry is not None:
+                    lib_entry["potential"] = True
+                # Drop from scheduled (do not append to new_list)
 
             elif action == "assign_date":
                 if date_str:
@@ -572,9 +621,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         data["scheduled"] = new_list
 
-        # Clean up library entries no longer referenced by any scheduled entry
+        # Update save flags based on action
         save_library = False
-        if action == "delete" and deleted_library_ids:
+        if action == "convert_to_potential":
+            save_library = True  # library entries were modified
+        elif action == "delete" and deleted_library_ids:
+            # Clean up library entries no longer referenced by any scheduled entry
             remaining_refs = {m.get("library_id") for m in data["scheduled"]}
             orphaned = deleted_library_ids - remaining_refs
             if orphaned:
@@ -587,9 +639,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.services.async_register(DOMAIN, "bulk", svc_bulk)
 
     async def svc_clear_potential(call: ServiceCall):
-        """Clear all potential (unscheduled) meals."""
-        data["scheduled"] = [m for m in data["scheduled"] if (m.get("date") or "").strip()]
-        await _save_and_notify(save_scheduled=True)
+        """Clear all potential meals (library entries with potential=True and their scheduled instances)."""
+        potential_ids = {lib.get("id") for lib in data["library"] if lib.get("potential", False)}
+        if not potential_ids:
+            return
+        original_scheduled = len(data["scheduled"])
+        data["scheduled"] = [m for m in data["scheduled"] if m.get("library_id") not in potential_ids]
+        data["library"] = [lib for lib in data["library"] if not lib.get("potential", False)]
+        save_scheduled = len(data["scheduled"]) != original_scheduled
+        await _save_and_notify(save_library=True, save_scheduled=save_scheduled)
 
     hass.services.async_register(DOMAIN, "clear_potential", svc_clear_potential)
 
@@ -648,6 +706,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             lib_entry["recipe_url"] = _validate_url(call.data.get("recipe_url", ""))
         if "notes" in call.data:
             lib_entry["notes"] = _sanitize_string(call.data.get("notes", ""), MAX_NOTES_LENGTH, "notes")
+        if "potential" in call.data:
+            lib_entry["potential"] = bool(call.data.get("potential", False))
 
         await _save_and_notify(save_library=True)
 
@@ -697,7 +757,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "meal_time": sched.get("meal_time", "Dinner"),
                 "recipe_url": library_entry.get("recipe_url", "") if library_entry else "",
                 "notes": library_entry.get("notes", "") if library_entry else "",
-                "potential": sched.get("potential", False),
             }
             merged_scheduled.append(merged_meal)
 
@@ -712,7 +771,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     "id": lib.get("id", ""),
                     "name": lib.get("name", ""),
                     "recipe_url": lib.get("recipe_url", ""),
-                    "notes": lib.get("notes", "")
+                    "notes": lib.get("notes", ""),
+                    "potential": lib.get("potential", False),
                 })
 
         connection.send_result(msg["id"], {
@@ -728,7 +788,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         vol.Optional("date"): str,
         vol.Optional("recipe_url"): str,
         vol.Optional("notes"): str,
-        vol.Optional("potential"): bool,
     })
     async def ws_add(hass, connection, msg):
         await hass.services.async_call(DOMAIN, "add", {
@@ -737,7 +796,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "date": msg.get("date",""),
             "recipe_url": msg.get("recipe_url",""),
             "notes": msg.get("notes",""),
-            "potential": msg.get("potential", False),
         })
         connection.send_result(msg["id"], {"success": True})
 
@@ -749,7 +807,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         vol.Optional("date"): str,
         vol.Optional("recipe_url"): str,
         vol.Optional("notes"): str,
-        vol.Optional("potential"): bool,
     })
     async def ws_update(hass, connection, msg):
         try:
@@ -757,9 +814,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             for k in ("name", "meal_time", "date", "recipe_url", "notes"):
                 if k in msg:
                     payload[k] = msg.get(k, "")
-            if "potential" in msg:
-                payload["potential"] = msg.get("potential", False)
-
             await hass.services.async_call(DOMAIN, "update", payload)
             connection.send_result(msg["id"], {"success": True})
         except Exception as e:
@@ -806,12 +860,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         vol.Optional("name"): str,
         vol.Optional("recipe_url"): str,
         vol.Optional("notes"): str,
+        vol.Optional("potential"): bool,
     })
     async def ws_update_library(hass, connection, msg):
         payload = {"library_id": msg.get("library_id", "")}
         for k in ("name", "recipe_url", "notes"):
             if k in msg:
                 payload[k] = msg.get(k, "")
+        if "potential" in msg:
+            payload["potential"] = msg.get("potential")
         await hass.services.async_call(DOMAIN, "update_library", payload)
         connection.send_result(msg["id"], {"success": True})
 

@@ -208,6 +208,58 @@ body {
   box-shadow: 0 2px 4px rgba(219, 68, 55, 0.3);
 }
 
+/* Potential Meal Toggle */
+.btn-potential {
+  background: transparent;
+  border: 1px solid var(--divider-color);
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.35;
+  transition: opacity 0.15s, box-shadow 0.15s;
+}
+
+.btn-potential:hover {
+  opacity: 0.7;
+}
+
+.btn-potential-active {
+  opacity: 1;
+  border-color: #f0b429;
+  box-shadow: 0 0 0 2px rgba(240, 180, 41, 0.3);
+}
+
+.btn-potential-active:hover {
+  opacity: 0.85;
+}
+
+/* Potential row highlight */
+.potential-row {
+  background: rgba(240, 180, 41, 0.08);
+}
+
+.potential-row td:first-child::before {
+  content: '⭐ ';
+  font-size: 12px;
+}
+
+/* Library filter select */
+.library-filter-select {
+  padding: 8px 12px;
+  border: 1px solid var(--divider-color);
+  border-radius: 4px;
+  background: var(--card-background-color, white);
+  color: var(--primary-text-color);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.library-filter-select:focus {
+  outline: none;
+  border-color: var(--primary-color, #03a9f4);
+}
+
 /* Search Box */
 .search-box {
   flex: 1;

@@ -365,7 +365,13 @@ class MealPlannerApp {
     // Add meal button (Library)
     const addMealLibraryBtn = document.getElementById('add-meal-library-btn');
     if (addMealLibraryBtn) {
-      addMealLibraryBtn.addEventListener('click', () => this.openMealModal());
+      addMealLibraryBtn.addEventListener('click', () => this.openMealModal(true));
+    }
+
+    // Library filter
+    const libraryFilter = document.getElementById('library-filter');
+    if (libraryFilter) {
+      libraryFilter.addEventListener('change', () => this.renderMealsLibrary());
     }
 
     // Settings button
@@ -448,6 +454,13 @@ class MealPlannerApp {
         const libData = JSON.parse(btn.getAttribute('data-lib'));
         this.deleteLibraryMeal(libData);
       }
+
+      // Toggle potential flag on library entry
+      if (target.classList.contains('toggle-potential-btn') || target.closest('.toggle-potential-btn')) {
+        const btn = target.classList.contains('toggle-potential-btn') ? target : target.closest('.toggle-potential-btn');
+        const libData = JSON.parse(btn.getAttribute('data-lib'));
+        this.togglePotential(libData.library_id, !libData.potential);
+      }
     });
   }
 
@@ -486,9 +499,6 @@ class MealPlannerApp {
         break;
       case 'meals':
         this.renderMealsLibrary();
-        break;
-      case 'potential':
-        this.renderPotentialMeals();
         break;
     }
   }
@@ -540,8 +550,7 @@ class MealPlannerApp {
         date: meal.date,
         meal_time: meal.meal_time,
         recipe_url: meal.recipe_url || '',
-        notes: meal.notes || '',
-        potential: meal.potential || false
+        notes: meal.notes || ''
       });
 
       html += '<tr>';
@@ -563,6 +572,8 @@ class MealPlannerApp {
 
   renderMealsLibrary() {
     const content = document.getElementById('meals-content');
+    const filterEl = document.getElementById('library-filter');
+    const filterValue = filterEl ? filterEl.value : 'all';
 
     // Read directly from library (includes all meals regardless of scheduled status)
     let meals = (this.data.library || []).slice().sort((a, b) =>
@@ -574,6 +585,13 @@ class MealPlannerApp {
       meals = meals.filter(meal =>
         meal.name.toLowerCase().includes(this.searchQuery)
       );
+    }
+
+    // Filter by potential status
+    if (filterValue === 'potential') {
+      meals = meals.filter(meal => meal.potential === true);
+    } else if (filterValue === 'planned') {
+      meals = meals.filter(meal => !meal.potential);
     }
 
     if (meals.length === 0) {
@@ -605,14 +623,20 @@ class MealPlannerApp {
         library_id: meal.id,
         name: meal.name,
         recipe_url: meal.recipe_url || '',
-        notes: meal.notes || ''
+        notes: meal.notes || '',
+        potential: meal.potential || false
       });
+      const isPotential = meal.potential === true;
+      const rowClass = isPotential ? ' class="potential-row"' : '';
+      const starClass = isPotential ? 'btn-potential btn-potential-active' : 'btn-potential';
+      const starTitle = isPotential ? 'Mark as planned' : 'Mark as potential';
 
-      html += '<tr>';
+      html += `<tr${rowClass}>`;
       html += `<td>${this.escapeHtml(meal.name)}</td>`;
       html += `<td>${meal.recipe_url ? `<a href="${this.escapeHtml(meal.recipe_url)}" target="_blank">View Recipe</a>` : '-'}</td>`;
       html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td>
+        <button class="${starClass} toggle-potential-btn" data-lib='${this.escapeHtml(libData)}' title="${starTitle}">⭐</button>
         <button class="edit-library-btn btn-primary" data-lib='${this.escapeHtml(libData)}'>Edit</button>
         <button class="delete-library-meal-btn btn-danger" data-lib='${this.escapeHtml(libData)}'>🗑️ Delete</button>
       </td>`;
@@ -623,57 +647,18 @@ class MealPlannerApp {
     content.innerHTML = html;
   }
 
-  renderPotentialMeals() {
-    const content = document.getElementById('potential-content');
-    const scheduled = this.data.scheduled || [];
-
-    // Filter meals marked as potential
-    const potentialMeals = scheduled.filter(m => m.potential === true);
-
-    if (potentialMeals.length === 0) {
-      content.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">💡</div>
-          <div class="empty-text">No potential meals</div>
-          <div class="empty-hint">Add meals without dates to track ideas</div>
-        </div>
-      `;
-      return;
-    }
-
-    let html = '<div class="table-container"><table>';
-    html += '<thead><tr>';
-    html += '<th>Meal Name</th>';
-    html += '<th>Recipe URL</th>';
-    html += '<th>Notes</th>';
-    html += '<th>Actions</th>';
-    html += '</tr></thead>';
-    html += '<tbody>';
-
-    potentialMeals.forEach(meal => {
-      const mealData = JSON.stringify({
-        id: meal.id,
-        name: meal.name,
-        date: meal.date || '',
-        meal_time: meal.meal_time,
-        recipe_url: meal.recipe_url || '',
-        notes: meal.notes || '',
-        potential: meal.potential || false
+  async togglePotential(libraryId, newValue) {
+    try {
+      await this.callService('meal_planner/update_library', {
+        library_id: libraryId,
+        potential: newValue
       });
-
-      html += '<tr>';
-      html += `<td>${this.escapeHtml(meal.name)}</td>`;
-      html += `<td>${meal.recipe_url ? `<a href="${this.escapeHtml(meal.recipe_url)}" target="_blank">View Recipe</a>` : '-'}</td>`;
-      html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
-      html += `<td>
-        <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}'>Schedule</button>
-        <button class="delete-meal-btn btn-danger" data-meal='${this.escapeHtml(mealData)}'>🗑️ Delete</button>
-      </td>`;
-      html += '</tr>';
-    });
-
-    html += '</tbody></table></div>';
-    content.innerHTML = html;
+      await this.loadData();
+      this.renderMealsLibrary();
+    } catch (error) {
+      console.error('[Meal Planner] Failed to toggle potential:', error);
+      await this.showAlert('Failed to update potential status. Please try again.');
+    }
   }
 
   openLibraryEditModal(libData) {
@@ -694,18 +679,16 @@ class MealPlannerApp {
     // Hide schedule-specific fields — not relevant when editing a library entry
     document.getElementById('meal-date').closest('.form-group').style.display = 'none';
     document.getElementById('meal-time').closest('.form-group').style.display = 'none';
-    document.getElementById('meal-potential').closest('.form-group').style.display = 'none';
 
     modal.classList.remove('hidden');
   }
 
-  openMealModal(isPotential = false, mealData = null) {
+  openMealModal(hideScheduleFields = false, mealData = null) {
     this.editingLibraryId = null;
 
     // Restore any hidden fields
     document.getElementById('meal-date').closest('.form-group').style.display = '';
     document.getElementById('meal-time').closest('.form-group').style.display = '';
-    document.getElementById('meal-potential').closest('.form-group').style.display = '';
     const modal = document.getElementById('meal-modal');
     const form = document.getElementById('meal-form');
     const title = document.getElementById('modal-title');
@@ -722,13 +705,11 @@ class MealPlannerApp {
       document.getElementById('meal-time').value = this.capitalize(mealData.meal_time || 'Dinner');
       document.getElementById('meal-recipe').value = mealData.recipe_url || '';
       document.getElementById('meal-notes').value = mealData.notes || '';
-      document.getElementById('meal-potential').checked = mealData.potential || false;
     } else {
       // Add mode
       title.textContent = 'Add Meal';
       // Leave date blank - user chooses if they want to schedule it
       document.getElementById('meal-date').value = '';
-      document.getElementById('meal-potential').checked = false;
     }
 
     modal.classList.remove('hidden');
@@ -743,7 +724,6 @@ class MealPlannerApp {
     // Restore any hidden fields
     document.getElementById('meal-date').closest('.form-group').style.display = '';
     document.getElementById('meal-time').closest('.form-group').style.display = '';
-    document.getElementById('meal-potential').closest('.form-group').style.display = '';
   }
 
   async handleFormSubmit() {
@@ -766,7 +746,6 @@ class MealPlannerApp {
       const mealTime = document.getElementById('meal-time').value;
       const recipe = document.getElementById('meal-recipe').value.trim();
       const notes = document.getElementById('meal-notes').value.trim();
-      const potential = document.getElementById('meal-potential').checked;
 
       if (!name) {
         await this.showAlert('Please enter a meal name');
@@ -778,8 +757,7 @@ class MealPlannerApp {
         date: date || '',
         meal_time: mealTime,
         recipe_url: recipe || '',
-        notes: notes || '',
-        potential: potential
+        notes: notes || ''
       };
 
       let success = false;
