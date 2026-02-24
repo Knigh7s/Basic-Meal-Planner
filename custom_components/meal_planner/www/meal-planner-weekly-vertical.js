@@ -125,6 +125,18 @@ class MealPlannerWeeklyVertical extends HTMLElement {
     return this.config.compact ? 3 : 5;
   }
 
+  static getConfigElement() {
+    return document.createElement('meal-planner-weekly-vertical-editor');
+  }
+
+  static getStubConfig() {
+    return {
+      entity: 'sensor.meal_planner_week',
+      title: 'Meal Plan',
+      show_snacks: true,
+      compact: false
+    };
+  }
 
   static get styles() {
     return `
@@ -257,6 +269,55 @@ class MealPlannerWeeklyVertical extends HTMLElement {
       }
     `;
   }
+}
+
+class MealPlannerWeeklyVerticalEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = config;
+    this._render();
+  }
+
+  _render() {
+    if (!this._config) return;
+    const cfg = this._config;
+    this.innerHTML = `
+      <div style="padding:16px;display:flex;flex-direction:column;gap:16px;">
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <label style="font-size:0.85em;font-weight:500;color:var(--secondary-text-color);">ENTITY</label>
+          <input type="text" name="entity" value="${cfg.entity || 'sensor.meal_planner_week'}" style="padding:8px 12px;border:1px solid var(--divider-color,#ccc);border-radius:4px;background:var(--secondary-background-color,#f5f5f5);color:var(--primary-text-color);font-size:1em;width:100%;box-sizing:border-box;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <label style="font-size:0.85em;font-weight:500;color:var(--secondary-text-color);">TITLE</label>
+          <input type="text" name="title" value="${cfg.title || 'Meal Plan'}" style="padding:8px 12px;border:1px solid var(--divider-color,#ccc);border-radius:4px;background:var(--secondary-background-color,#f5f5f5);color:var(--primary-text-color);font-size:1em;width:100%;box-sizing:border-box;">
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;">
+          <label style="font-size:0.95em;">Show Snacks</label>
+          <input type="checkbox" name="show_snacks" ${cfg.show_snacks !== false ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary-color);">
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;">
+          <label style="font-size:0.95em;">Compact Mode</label>
+          <input type="checkbox" name="compact" ${cfg.compact ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary-color);">
+        </div>
+      </div>
+    `;
+    this.querySelectorAll('input').forEach(input => {
+      input.addEventListener('change', this._changed.bind(this));
+    });
+  }
+
+  _changed(ev) {
+    const input = ev.target;
+    const value = input.type === 'checkbox' ? input.checked : input.value;
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      detail: { config: { ...this._config, [input.name]: value } },
+      bubbles: true,
+      composed: true
+    }));
+  }
+}
+
+if (!customElements.get('meal-planner-weekly-vertical-editor')) {
+  customElements.define('meal-planner-weekly-vertical-editor', MealPlannerWeeklyVerticalEditor);
 }
 
 // Only define if not already defined
