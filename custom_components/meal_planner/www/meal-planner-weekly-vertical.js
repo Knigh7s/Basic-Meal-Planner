@@ -261,12 +261,14 @@ class MealPlannerWeeklyVertical extends HTMLElement {
 // Only define if not already defined
 if (!customElements.get('meal-planner-weekly-vertical')) {
   customElements.define('meal-planner-weekly-vertical', MealPlannerWeeklyVertical);
+}
 
-  window.customCards = window.customCards || [];
+window.customCards = window.customCards || [];
+if (!window.customCards.find(c => c.type === 'meal-planner-weekly-vertical')) {
   window.customCards.push({
     type: 'meal-planner-weekly-vertical',
-    name: 'Meal Planner Weekly Vertical',
-    description: 'Weekly meal plan in vertical day-by-day layout',
+    name: 'Meal Planner: Weekly Vertical',
+    description: 'Weekly meal plan in a vertical day-by-day layout',
     preview: false,
     documentationURL: 'https://github.com/Knigh7s/Basic-Meal-Planner'
   });

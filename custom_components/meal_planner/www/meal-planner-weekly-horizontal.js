@@ -278,12 +278,14 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
 // Only define if not already defined
 if (!customElements.get('meal-planner-weekly-horizontal')) {
   customElements.define('meal-planner-weekly-horizontal', MealPlannerWeeklyHorizontal);
+}
 
-  window.customCards = window.customCards || [];
+window.customCards = window.customCards || [];
+if (!window.customCards.find(c => c.type === 'meal-planner-weekly-horizontal')) {
   window.customCards.push({
     type: 'meal-planner-weekly-horizontal',
-    name: 'Meal Planner Weekly Horizontal',
-    description: 'Weekly meal plan in calendar grid layout',
+    name: 'Meal Planner: Weekly Horizontal',
+    description: 'Weekly meal plan in a horizontal calendar grid layout',
     preview: false,
     documentationURL: 'https://github.com/Knigh7s/Basic-Meal-Planner'
   });

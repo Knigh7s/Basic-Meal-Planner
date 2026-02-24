@@ -220,12 +220,14 @@ class MealPlannerPotentialMeals extends HTMLElement {
 // Only define if not already defined
 if (!customElements.get('meal-planner-potential-meals')) {
   customElements.define('meal-planner-potential-meals', MealPlannerPotentialMeals);
+}
 
-  window.customCards = window.customCards || [];
+window.customCards = window.customCards || [];
+if (!window.customCards.find(c => c.type === 'meal-planner-potential-meals')) {
   window.customCards.push({
     type: 'meal-planner-potential-meals',
-    name: 'Meal Planner Potential Meals',
-    description: 'List of unscheduled potential meals',
+    name: 'Meal Planner: Potential Meals',
+    description: 'List of meals marked as potential',
     preview: false,
     documentationURL: 'https://github.com/Knigh7s/Basic-Meal-Planner'
   });
