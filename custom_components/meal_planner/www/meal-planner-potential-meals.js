@@ -96,9 +96,6 @@ class MealPlannerPotentialMeals extends HTMLElement {
     return 3;
   }
 
-  getGridOptions() {
-    return { columns: 4, rows: 3, min_columns: 2, min_rows: 2 };
-  }
 
   static get styles() {
     return `

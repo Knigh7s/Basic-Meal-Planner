@@ -125,9 +125,6 @@ class MealPlannerWeeklyVertical extends HTMLElement {
     return this.config.compact ? 3 : 5;
   }
 
-  getGridOptions() {
-    return { columns: 6, rows: 5, min_columns: 3, min_rows: 3 };
-  }
 
   static get styles() {
     return `
