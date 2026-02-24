@@ -623,6 +623,58 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.services.async_register(DOMAIN, "update_settings", svc_update_settings)
 
+    async def svc_update_library(call: ServiceCall):
+        """Update a library entry's name, recipe_url, or notes by library_id."""
+        library_id = (call.data.get("library_id") or "").strip()
+        if not library_id:
+            _LOGGER.warning("update_library: library_id is required")
+            return
+
+        lib_entry = None
+        for lib in data["library"]:
+            if lib.get("id") == library_id:
+                lib_entry = lib
+                break
+
+        if not lib_entry:
+            _LOGGER.warning("update_library: library entry not found: %s", library_id)
+            return
+
+        if "name" in call.data:
+            new_name = _sanitize_string(call.data.get("name", ""), MAX_NAME_LENGTH, "meal name")
+            if new_name:
+                lib_entry["name"] = new_name
+        if "recipe_url" in call.data:
+            lib_entry["recipe_url"] = _validate_url(call.data.get("recipe_url", ""))
+        if "notes" in call.data:
+            lib_entry["notes"] = _sanitize_string(call.data.get("notes", ""), MAX_NOTES_LENGTH, "notes")
+
+        await _save_and_notify(save_library=True)
+
+    hass.services.async_register(DOMAIN, "update_library", svc_update_library)
+
+    async def svc_delete_library(call: ServiceCall):
+        """Delete a library entry and all its scheduled instances by library_id."""
+        library_id = (call.data.get("library_id") or "").strip()
+        if not library_id:
+            _LOGGER.warning("delete_library: library_id is required")
+            return
+
+        original_scheduled = len(data["scheduled"])
+        data["scheduled"] = [m for m in data["scheduled"] if m.get("library_id") != library_id]
+
+        original_library = len(data["library"])
+        data["library"] = [lib for lib in data["library"] if lib.get("id") != library_id]
+
+        save_scheduled = len(data["scheduled"]) != original_scheduled
+        save_library = len(data["library"]) != original_library
+
+        if save_scheduled or save_library:
+            _LOGGER.info("delete_library: removed library entry %s (%d scheduled entries)", library_id, original_scheduled - len(data["scheduled"]))
+            await _save_and_notify(save_scheduled=save_scheduled, save_library=save_library)
+
+    hass.services.async_register(DOMAIN, "delete_library", svc_delete_library)
+
     # ---------- WebSocket commands (register BEFORE returning) ----------
     _LOGGER.info("About to register WebSocket commands...")
     from homeassistant.components import websocket_api
@@ -649,7 +701,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             }
             merged_scheduled.append(merged_meal)
 
-        # Build library list with unique names for frontend
+        # Build library list with unique names for frontend (include id for edit/delete)
         unique_library = []
         seen_names = set()
         for lib in data.get("library", []):
@@ -657,6 +709,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             if name and name not in seen_names:
                 seen_names.add(name)
                 unique_library.append({
+                    "id": lib.get("id", ""),
                     "name": lib.get("name", ""),
                     "recipe_url": lib.get("recipe_url", ""),
                     "notes": lib.get("notes", "")
@@ -747,6 +800,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await hass.services.async_call(DOMAIN, "update_settings", settings_data)
         connection.send_result(msg["id"], {"success": True})
 
+    @websocket_api.websocket_command({
+        vol.Required("type"): f"{DOMAIN}/update_library",
+        vol.Required("library_id"): str,
+        vol.Optional("name"): str,
+        vol.Optional("recipe_url"): str,
+        vol.Optional("notes"): str,
+    })
+    async def ws_update_library(hass, connection, msg):
+        payload = {"library_id": msg.get("library_id", "")}
+        for k in ("name", "recipe_url", "notes"):
+            if k in msg:
+                payload[k] = msg.get(k, "")
+        await hass.services.async_call(DOMAIN, "update_library", payload)
+        connection.send_result(msg["id"], {"success": True})
+
+    @websocket_api.websocket_command({
+        vol.Required("type"): f"{DOMAIN}/delete_library",
+        vol.Required("library_id"): str,
+    })
+    async def ws_delete_library(hass, connection, msg):
+        await hass.services.async_call(DOMAIN, "delete_library", {
+            "library_id": msg.get("library_id", "")
+        })
+        connection.send_result(msg["id"], {"success": True})
+
     # Test command - simple ping
     @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/ping"})
     @callback
@@ -768,6 +846,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.info("Registered: bulk")
         websocket_api.async_register_command(hass, ws_update_settings)
         _LOGGER.info("Registered: update_settings")
+        websocket_api.async_register_command(hass, ws_update_library)
+        _LOGGER.info("Registered: update_library")
+        websocket_api.async_register_command(hass, ws_delete_library)
+        _LOGGER.info("Registered: delete_library")
     except Exception as e:
         _LOGGER.error("Failed to register websocket commands: %s", e, exc_info=True)
     _LOGGER.info("Websocket commands registered successfully")

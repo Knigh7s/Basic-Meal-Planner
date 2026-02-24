@@ -109,7 +109,9 @@ class MealPlannerApp {
         'meal_planner/add': 'add',
         'meal_planner/update': 'update',
         'meal_planner/bulk': 'bulk',
-        'meal_planner/update_settings': 'update_settings'
+        'meal_planner/update_settings': 'update_settings',
+        'meal_planner/update_library': 'update_library',
+        'meal_planner/delete_library': 'delete_library'
       };
 
       const serviceName = serviceMap[type];
@@ -303,6 +305,18 @@ class MealPlannerApp {
     }
   }
 
+  async updateLibraryEntry(libraryId, fields) {
+    try {
+      await this.callService('meal_planner/update_library', { library_id: libraryId, ...fields });
+      await this.loadData();
+      this.renderCurrentView();
+      return true;
+    } catch (error) {
+      console.error('[Meal Planner] Failed to update library entry:', error);
+      return false;
+    }
+  }
+
   async updateMeal(mealId, newMeal) {
     if (!this.hass) {
       console.warn('[Meal Planner] No HASS connection - cannot update meal');
@@ -407,25 +421,32 @@ class MealPlannerApp {
     document.getElementById('views').addEventListener('click', (e) => {
       const target = e.target;
 
-      // Edit meal
+      // Edit scheduled meal (dashboard / potential views)
       if (target.classList.contains('edit-meal-btn') || target.closest('.edit-meal-btn')) {
         const btn = target.classList.contains('edit-meal-btn') ? target : target.closest('.edit-meal-btn');
         const mealData = JSON.parse(btn.getAttribute('data-meal'));
         this.openMealModal(false, mealData);
       }
 
-      // Delete meal
+      // Edit library entry (library view)
+      if (target.classList.contains('edit-library-btn') || target.closest('.edit-library-btn')) {
+        const btn = target.classList.contains('edit-library-btn') ? target : target.closest('.edit-library-btn');
+        const libData = JSON.parse(btn.getAttribute('data-lib'));
+        this.openLibraryEditModal(libData);
+      }
+
+      // Delete scheduled meal (dashboard / potential views)
       if (target.classList.contains('delete-meal-btn') || target.closest('.delete-meal-btn')) {
         const btn = target.classList.contains('delete-meal-btn') ? target : target.closest('.delete-meal-btn');
         const mealData = JSON.parse(btn.getAttribute('data-meal'));
         this.deleteMeal(mealData);
       }
 
-      // Delete library meal (all instances with this name)
+      // Delete library entry (all scheduled instances + library record)
       if (target.classList.contains('delete-library-meal-btn') || target.closest('.delete-library-meal-btn')) {
         const btn = target.classList.contains('delete-library-meal-btn') ? target : target.closest('.delete-library-meal-btn');
-        const mealName = btn.getAttribute('data-name');
-        this.deleteLibraryMeal(mealName);
+        const libData = JSON.parse(btn.getAttribute('data-lib'));
+        this.deleteLibraryMeal(libData);
       }
     });
   }
@@ -542,30 +563,20 @@ class MealPlannerApp {
 
   renderMealsLibrary() {
     const content = document.getElementById('meals-content');
-    const scheduled = this.data.scheduled || [];
 
-    // Group meals by name to create library (unique meal names)
-    const libraryMap = new Map();
-    scheduled.forEach(meal => {
-      const key = meal.name.toLowerCase();
-      if (!libraryMap.has(key)) {
-        libraryMap.set(key, meal); // Use first instance of each meal name
-      }
-    });
-
-    // Convert to array and sort alphabetically
-    let uniqueMeals = Array.from(libraryMap.values()).sort((a, b) =>
+    // Read directly from library (includes all meals regardless of scheduled status)
+    let meals = (this.data.library || []).slice().sort((a, b) =>
       a.name.toLowerCase().localeCompare(b.name.toLowerCase())
     );
 
     // Filter by search query
     if (this.searchQuery) {
-      uniqueMeals = uniqueMeals.filter(meal =>
+      meals = meals.filter(meal =>
         meal.name.toLowerCase().includes(this.searchQuery)
       );
     }
 
-    if (uniqueMeals.length === 0) {
+    if (meals.length === 0) {
       const message = this.searchQuery
         ? `No meals found matching "${this.escapeHtml(this.searchQuery)}"`
         : 'No meals in library yet';
@@ -589,15 +600,12 @@ class MealPlannerApp {
     html += '</tr></thead>';
     html += '<tbody>';
 
-    uniqueMeals.forEach(meal => {
-      const mealData = JSON.stringify({
-        id: meal.id,
+    meals.forEach(meal => {
+      const libData = JSON.stringify({
+        library_id: meal.id,
         name: meal.name,
-        date: meal.date || '',
-        meal_time: meal.meal_time || 'Dinner',
         recipe_url: meal.recipe_url || '',
-        notes: meal.notes || '',
-        potential: meal.potential || false
+        notes: meal.notes || ''
       });
 
       html += '<tr>';
@@ -605,8 +613,8 @@ class MealPlannerApp {
       html += `<td>${meal.recipe_url ? `<a href="${this.escapeHtml(meal.recipe_url)}" target="_blank">View Recipe</a>` : '-'}</td>`;
       html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td>
-        <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}'>Edit</button>
-        <button class="delete-library-meal-btn btn-danger" data-name='${this.escapeHtml(meal.name)}'>🗑️ Delete</button>
+        <button class="edit-library-btn btn-primary" data-lib='${this.escapeHtml(libData)}'>Edit</button>
+        <button class="delete-library-meal-btn btn-danger" data-lib='${this.escapeHtml(libData)}'>🗑️ Delete</button>
       </td>`;
       html += '</tr>';
     });
@@ -668,7 +676,36 @@ class MealPlannerApp {
     content.innerHTML = html;
   }
 
+  openLibraryEditModal(libData) {
+    // Reuse the meal modal but only for name/recipe/notes (library-only edit)
+    const modal = document.getElementById('meal-modal');
+    const form = document.getElementById('meal-form');
+    const title = document.getElementById('modal-title');
+
+    form.reset();
+    this.editingMeal = null;
+    this.editingLibraryId = libData.library_id;
+
+    title.textContent = 'Edit Library Entry';
+    document.getElementById('meal-name').value = libData.name || '';
+    document.getElementById('meal-recipe').value = libData.recipe_url || '';
+    document.getElementById('meal-notes').value = libData.notes || '';
+
+    // Hide schedule-specific fields — not relevant when editing a library entry
+    document.getElementById('meal-date').closest('.form-group').style.display = 'none';
+    document.getElementById('meal-time').closest('.form-group').style.display = 'none';
+    document.getElementById('meal-potential').closest('.form-group').style.display = 'none';
+
+    modal.classList.remove('hidden');
+  }
+
   openMealModal(isPotential = false, mealData = null) {
+    this.editingLibraryId = null;
+
+    // Restore any hidden fields
+    document.getElementById('meal-date').closest('.form-group').style.display = '';
+    document.getElementById('meal-time').closest('.form-group').style.display = '';
+    document.getElementById('meal-potential').closest('.form-group').style.display = '';
     const modal = document.getElementById('meal-modal');
     const form = document.getElementById('meal-form');
     const title = document.getElementById('modal-title');
@@ -701,6 +738,12 @@ class MealPlannerApp {
     const modal = document.getElementById('meal-modal');
     modal.classList.add('hidden');
     this.editingMeal = null;
+    this.editingLibraryId = null;
+
+    // Restore any hidden fields
+    document.getElementById('meal-date').closest('.form-group').style.display = '';
+    document.getElementById('meal-time').closest('.form-group').style.display = '';
+    document.getElementById('meal-potential').closest('.form-group').style.display = '';
   }
 
   async handleFormSubmit() {
@@ -741,16 +784,19 @@ class MealPlannerApp {
 
       let success = false;
 
-      if (this.editingMeal && this.editingMeal.id) {
-        // Update existing meal
-        console.log('[Meal Planner] Calling updateMeal with ID:', this.editingMeal.id);
+      if (this.editingLibraryId) {
+        // Editing a library entry directly (from Meals Library view)
+        success = await this.updateLibraryEntry(this.editingLibraryId, {
+          name,
+          recipe_url: recipe || '',
+          notes: notes || ''
+        });
+      } else if (this.editingMeal && this.editingMeal.id) {
+        // Update an existing scheduled entry
         success = await this.updateMeal(this.editingMeal.id, mealData);
-        console.log('[Meal Planner] updateMeal returned:', success);
       } else {
         // Add new meal
-        console.log('[Meal Planner] Calling addMeal');
         success = await this.addMeal(mealData);
-        console.log('[Meal Planner] addMeal returned:', success);
       }
 
       if (success) {
@@ -844,54 +890,25 @@ class MealPlannerApp {
     }
   }
 
-  async deleteLibraryMeal(mealName) {
-    // Find all scheduled meals with this name
-    const scheduled = this.data.scheduled || [];
-    const mealsToDelete = scheduled.filter(m => m.name === mealName);
+  async deleteLibraryMeal(libData) {
+    const mealName = libData.name;
+    const libraryId = libData.library_id;
 
-    if (mealsToDelete.length === 0) {
-      await this.showAlert(`No scheduled meals found for "${mealName}"`);
-      return;
-    }
-
-    const count = mealsToDelete.length;
-    const message = count === 1
-      ? `Delete "${mealName}"? This will remove 1 scheduled meal.`
-      : `Delete "${mealName}"? This will remove all ${count} scheduled meals with this name.`;
-
-    const confirmed = await this.showConfirm(message);
-    if (!confirmed) {
-      return;
-    }
+    const confirmed = await this.showConfirm(`Delete "${mealName}" from your library? This will also remove all scheduled instances of this meal.`);
+    if (!confirmed) return;
 
     if (!this.hass) {
-      console.warn('[Meal Planner] No HASS connection - cannot delete meals');
-      await this.showAlert('Failed to delete meals. Please try again.');
+      await this.showAlert('Failed to delete meal. Please try again.');
       return;
     }
 
     try {
-      console.log('[Meal Planner] Deleting library meal:', mealName, 'Count:', count);
-
-      // Get all IDs
-      const ids = mealsToDelete.map(m => m.id);
-
-      // Use bulk delete service
-      await this.callService('meal_planner/bulk', {
-        action: 'delete',
-        ids: ids,
-        date: '',
-        meal_time: ''
-      });
-
-      // Reload data
+      await this.callService('meal_planner/delete_library', { library_id: libraryId });
       await this.loadData();
       this.renderCurrentView();
-
-      console.log('[Meal Planner] Library meal deleted successfully');
     } catch (error) {
       console.error('[Meal Planner] Failed to delete library meal:', error);
-      await this.showAlert('Failed to delete meals. Please try again.');
+      await this.showAlert('Failed to delete meal. Please try again.');
     }
   }
 
