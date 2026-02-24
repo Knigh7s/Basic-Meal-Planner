@@ -125,6 +125,10 @@ class MealPlannerWeeklyVertical extends HTMLElement {
     return this.config.compact ? 3 : 5;
   }
 
+  getGridSize() {
+    return { rows: 5, columns: 2 };
+  }
+
   static get styles() {
     return `
       .meal-planner-vertical-card .day-list {

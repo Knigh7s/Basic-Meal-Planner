@@ -96,6 +96,10 @@ class MealPlannerPotentialMeals extends HTMLElement {
     return 3;
   }
 
+  getGridSize() {
+    return { rows: 3, columns: 2 };
+  }
+
   static get styles() {
     return `
       .meal-planner-potential-card .card-header {
