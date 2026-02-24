@@ -561,7 +561,7 @@ class MealPlannerApp {
       html += `<td>${meal.recipe_url ? `<a href="${this.escapeHtml(meal.recipe_url)}" target="_blank">View Recipe</a>` : '-'}</td>`;
       html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td>
-        <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}'>Edit</button>
+        <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}'>✏️ Edit</button>
         <button class="delete-meal-btn btn-danger" data-meal='${this.escapeHtml(mealData)}'>🗑️ Delete</button>
       </td>`;
       html += '</tr>';
