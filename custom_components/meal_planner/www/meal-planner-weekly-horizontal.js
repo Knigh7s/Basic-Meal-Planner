@@ -119,8 +119,8 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
     return 4;
   }
 
-  getGridSize() {
-    return { rows: 4, columns: 4 };
+  getGridOptions() {
+    return { columns: 12, rows: 4, min_columns: 6, min_rows: 2 };
   }
 
   static get styles() {
