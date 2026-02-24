@@ -164,14 +164,19 @@
       <div class="modal-body">
         <form id="settings-form">
           <div class="form-group">
-            <label for="settings-days-after">Days After Today to Show</label>
+            <label for="settings-days-after">Days After Today (Card View)</label>
             <input type="number" id="settings-days-after" min="0" max="6" value="3">
             <small>
-              Controls the rolling view window. The dashboard always shows 7 days total.<br>
-              <strong>Examples:</strong><br>
-              • 3 days after = 3 days before + today + 3 days after (today in middle, row 4)<br>
-              • 6 days after = 0 days before + today + 6 days after (today at top, row 1)<br>
-              • 0 days after = 6 days before + today + 0 days after (today at bottom, row 7)
+              Controls the weekly card rolling window (always 7 days total).<br>
+              • 3 = 3 days before + today + 3 after &nbsp;• 6 = today + 6 after &nbsp;• 0 = 6 before + today
+            </small>
+          </div>
+
+          <div class="form-group">
+            <label for="settings-days-to-keep">Days of Past Meals to Keep</label>
+            <input type="number" id="settings-days-to-keep" min="1" max="365" value="14">
+            <small>
+              Scheduled meals older than this are permanently removed from storage on restart or when settings are saved. Library entries are never deleted.
             </small>
           </div>
 

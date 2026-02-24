@@ -36,7 +36,7 @@ _LOGGER = logging.getLogger(__name__)
 # ----------------------------
 
 DEFAULT_DATA = {
-    "settings": {"week_start": "Sunday"},
+    "settings": {"week_start": "Sunday", "days_after_today": 3, "days_to_keep": 14},
     "scheduled": [],  # list of entries with id, name, meal_time, date, recipe_url, notes
     "library": [],    # list of {name, recipe_url, notes}
 }
@@ -140,6 +140,26 @@ def _enforce_scheduled_limits(data: dict):
     _LOGGER.info("Scheduled meals limit reached, removed %d oldest entries", len(scheduled) - MAX_SCHEDULED_SIZE)
 
 
+def _purge_old_scheduled(data: dict) -> int:
+    """Remove scheduled entries with dates older than days_to_keep. Returns count removed."""
+    days_to_keep = int(data.get("settings", {}).get("days_to_keep", 14))
+    if days_to_keep < 0:
+        return 0
+    cutoff = datetime.now().date() - timedelta(days=days_to_keep)
+    original = data["scheduled"]
+    kept = [
+        m for m in original
+        if not (m.get("date") or "").strip()  # keep: no date (potential meals)
+        or _parse_date(m.get("date", "")) is None  # keep: unparseable date
+        or _parse_date(m.get("date", "")) >= cutoff  # keep: recent enough
+    ]
+    removed = len(original) - len(kept)
+    if removed:
+        data["scheduled"] = kept
+        _LOGGER.info("Purged %d scheduled entries older than %d days (cutoff: %s)", removed, days_to_keep, cutoff)
+    return removed
+
+
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     return True
 
@@ -173,7 +193,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     data = {
         "library": [],     # List of {id, name, recipe_url, notes}
         "scheduled": [],   # List of {id, library_id, date, meal_time, potential}
-        "settings": {"week_start": "Sunday", "days_after_today": 3}
+        "settings": {"week_start": "Sunday", "days_after_today": 3, "days_to_keep": 14}
     }
 
     # Try loading new format first
@@ -342,6 +362,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if "week" in sensors:
             await sensors["week"].async_update_from_data()
         hass.bus.async_fire(EVENT_UPDATED)
+
+    # Purge old scheduled entries on startup
+    _startup_purged = _purge_old_scheduled(data)
+    if _startup_purged > 0:
+        await _save_and_notify(save_scheduled=True)
 
     # ---------- Services ----------
     async def svc_add(call: ServiceCall):
@@ -593,7 +618,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         """Update settings."""
         settings_data = dict(call.data)
         data["settings"].update(settings_data)
-        await _save_and_notify(save_settings=True)
+        purged = _purge_old_scheduled(data)
+        await _save_and_notify(save_settings=True, save_scheduled=purged > 0)
 
     hass.services.async_register(DOMAIN, "update_settings", svc_update_settings)
 
@@ -707,6 +733,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         vol.Required("type"): f"{DOMAIN}/update_settings",
         vol.Optional("week_start"): str,
         vol.Optional("days_after_today"): int,
+        vol.Optional("days_to_keep"): int,
     })
     async def ws_update_settings(hass, connection, msg):
         settings_data = {}
@@ -714,6 +741,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             settings_data["week_start"] = msg.get("week_start")
         if "days_after_today" in msg:
             settings_data["days_after_today"] = msg.get("days_after_today")
+        if "days_to_keep" in msg:
+            settings_data["days_to_keep"] = msg.get("days_to_keep")
 
         await hass.services.async_call(DOMAIN, "update_settings", settings_data)
         connection.send_result(msg["id"], {"success": True})

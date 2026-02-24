@@ -476,11 +476,19 @@ class MealPlannerApp {
     const content = document.getElementById('dashboard-content');
     const scheduled = this.data.scheduled || [];
 
-    // Filter only meals with dates (not potential)
-    const scheduledMeals = scheduled.filter(m => m.date && m.date.trim());
+    // Filter to meals with dates (not potential) within the keep window
+    const daysToKeep = this.data.settings?.days_to_keep ?? 14;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - daysToKeep);
+    cutoff.setHours(0, 0, 0, 0);
 
-    // Sort by date (newest first)
-    scheduledMeals.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const scheduledMeals = scheduled.filter(m => {
+      if (!m.date || !m.date.trim()) return false;
+      return new Date(m.date + 'T00:00:00') >= cutoff;
+    });
+
+    // Sort ascending: past meals at top, upcoming meals below
+    scheduledMeals.sort((a, b) => new Date(a.date) - new Date(b.date));
 
     if (scheduledMeals.length === 0) {
       content.innerHTML = `
@@ -763,10 +771,9 @@ class MealPlannerApp {
 
   openSettingsModal() {
     const modal = document.getElementById('settings-modal');
-    const input = document.getElementById('settings-days-after');
 
-    // Populate current value
-    input.value = this.data.settings?.days_after_today || 3;
+    document.getElementById('settings-days-after').value = this.data.settings?.days_after_today ?? 3;
+    document.getElementById('settings-days-to-keep').value = this.data.settings?.days_to_keep ?? 14;
 
     modal.classList.remove('hidden');
   }
@@ -778,20 +785,24 @@ class MealPlannerApp {
 
   async handleSettingsSubmit() {
     const daysAfter = parseInt(document.getElementById('settings-days-after').value);
+    const daysToKeep = parseInt(document.getElementById('settings-days-to-keep').value);
 
     if (daysAfter < 0 || daysAfter > 6) {
       await this.showAlert('Days after today must be between 0 and 6');
       return;
     }
+    if (daysToKeep < 1 || daysToKeep > 365) {
+      await this.showAlert('Days to keep must be between 1 and 365');
+      return;
+    }
 
-    // Update settings
     this.data.settings.days_after_today = daysAfter;
+    this.data.settings.days_to_keep = daysToKeep;
 
     const success = await this.saveSettings();
 
     if (success) {
       this.closeSettingsModal();
-      // Reload to show updated view
       await this.loadData();
       this.renderCurrentView();
     } else {
