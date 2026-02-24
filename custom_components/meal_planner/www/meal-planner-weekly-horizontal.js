@@ -41,13 +41,14 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
 
   updateCard(entity) {
     const days = entity.attributes.days || {};
-    const daysToShow = entity.attributes.days_to_show || 7;
+    const totalDays = entity.attributes.total_days || 7;
+    const todayIndex = entity.attributes.today_index ?? 0;
 
     this.header.textContent = this.config.title;
 
     // Build day order from day0, day1, day2, etc.
     const dayOrder = [];
-    for (let i = 0; i < daysToShow; i++) {
+    for (let i = 0; i < totalDays; i++) {
       dayOrder.push(`day${i}`);
     }
 
@@ -63,7 +64,7 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
     dayOrder.forEach((day, index) => {
       const dayData = days[day] || {};
       const label = dayData.label || day.toUpperCase();
-      const isToday = index === 0;  // day0 is always today
+      const isToday = index === todayIndex;
 
       // Get day name and date number
       const dayParts = label.split(' ');
@@ -86,7 +87,7 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
       dayOrder.forEach((day, index) => {
         const meal = days[day]?.[mealTime] || '';
         const isEmpty = !meal || meal.trim() === '';
-        const isToday = index === 0;  // day0 is always today
+        const isToday = index === todayIndex;
 
         if (isEmpty && !this.config.show_empty) {
           html += `<td class="empty ${isToday ? 'today' : ''}"></td>`;

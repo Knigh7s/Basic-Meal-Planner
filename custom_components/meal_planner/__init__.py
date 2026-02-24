@@ -15,7 +15,6 @@ from homeassistant.components.frontend import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.helpers.storage import Store
 from homeassistant.core import callback
 
 from .const import (
@@ -524,6 +523,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         idset = set(ids)
         new_list = []
+        deleted_library_ids = set()
 
         for m in data["scheduled"]:
             if m["id"] not in idset:
@@ -542,11 +542,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 new_list.append(m)
 
             elif action == "delete":
+                deleted_library_ids.add(m.get("library_id", ""))
                 # drop this row
-                pass
 
         data["scheduled"] = new_list
-        await _save_and_notify(save_scheduled=True)
+
+        # Clean up library entries no longer referenced by any scheduled entry
+        save_library = False
+        if action == "delete" and deleted_library_ids:
+            remaining_refs = {m.get("library_id") for m in data["scheduled"]}
+            orphaned = deleted_library_ids - remaining_refs
+            if orphaned:
+                data["library"] = [lib for lib in data["library"] if lib.get("id") not in orphaned]
+                save_library = True
+                _LOGGER.info("Removed %d orphaned library entries after bulk delete", len(orphaned))
+
+        await _save_and_notify(save_scheduled=True, save_library=save_library)
 
     hass.services.async_register(DOMAIN, "bulk", svc_bulk)
 
@@ -663,26 +674,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     })
     async def ws_update(hass, connection, msg):
         try:
-            _LOGGER.info("=" * 80)
-            _LOGGER.info("WS UPDATE CALLED!")
-            _LOGGER.info("Message: %s", msg)
-            _LOGGER.info("=" * 80)
-
-            payload = {
-                "row_id": msg.get("row_id", ""),
-            }
+            payload = {"row_id": msg.get("row_id", "")}
             for k in ("name", "meal_time", "date", "recipe_url", "notes"):
                 if k in msg:
                     payload[k] = msg.get(k, "")
             if "potential" in msg:
                 payload["potential"] = msg.get("potential", False)
 
-            _LOGGER.info("Calling update service with payload: %s", payload)
             await hass.services.async_call(DOMAIN, "update", payload)
-            _LOGGER.info("Update service completed, sending result")
             connection.send_result(msg["id"], {"success": True})
         except Exception as e:
-            _LOGGER.error("WS UPDATE ERROR: %s", e, exc_info=True)
+            _LOGGER.error("ws_update failed: %s", e, exc_info=True)
             connection.send_error(msg["id"], "update_failed", str(e))
 
     @websocket_api.websocket_command({

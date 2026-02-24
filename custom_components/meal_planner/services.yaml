@@ -16,6 +16,7 @@ add:
             - Breakfast
             - Lunch
             - Dinner
+            - Snack
     date:
       required: false
       example: "2025-10-31"
@@ -31,6 +32,69 @@ add:
       example: "Use gluten-free pasta"
       selector:
         text:
+    potential:
+      required: false
+      example: false
+      selector:
+        boolean:
+
+update:
+  name: Update meal
+  description: Update an existing scheduled meal entry by its ID.
+  fields:
+    row_id:
+      required: true
+      example: "abc123def456"
+      selector:
+        text:
+    name:
+      required: false
+      example: "Chicken Alfredo"
+      selector:
+        text:
+    meal_time:
+      required: false
+      example: "Dinner"
+      selector:
+        select:
+          options:
+            - Breakfast
+            - Lunch
+            - Dinner
+            - Snack
+    date:
+      required: false
+      example: "2025-10-31"
+      selector:
+        date:
+    recipe_url:
+      required: false
+      example: "https://example.com/alfredo"
+      selector:
+        text:
+    notes:
+      required: false
+      example: "Use gluten-free pasta"
+      selector:
+        text:
+    potential:
+      required: false
+      example: false
+      selector:
+        boolean:
+
+update_settings:
+  name: Update settings
+  description: Update meal planner settings.
+  fields:
+    days_after_today:
+      required: false
+      example: 3
+      selector:
+        number:
+          min: 0
+          max: 6
+          mode: slider
 
 bulk:
   name: Bulk action
