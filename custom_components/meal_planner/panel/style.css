@@ -643,13 +643,6 @@ td a:hover {
 
 /* Responsive */
 @media (max-width: 768px) {
-  .nav-tabs {
-    flex-direction: column;
-  }
-
-  .tab-label {
-    display: none;
-  }
 
   .view-header {
     flex-direction: column;
