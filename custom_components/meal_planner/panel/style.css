@@ -240,6 +240,12 @@ body {
   align-items: center;
 }
 
+/* Star column cell */
+.star-td {
+  text-align: center;
+  padding: 8px 4px;
+}
+
 /* Potential Meal Toggle */
 .btn-potential {
   background: transparent;
@@ -694,7 +700,74 @@ td a:hover {
     grid-template-columns: 1fr;
   }
 
+  /* Card layout — each row becomes a stacked card */
   .table-container {
-    overflow-x: scroll;
+    overflow-x: visible;
+  }
+
+  .table-container table {
+    display: block;
+    width: 100%;
+    table-layout: auto;
+  }
+
+  .table-container thead {
+    display: none;
+  }
+
+  .table-container tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .table-container tr {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--divider-color);
+    border-radius: 8px;
+    padding: 10px 12px;
+    overflow: visible;
+  }
+
+  .table-container td {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    border-bottom: none;
+    padding: 3px 0;
+    overflow: visible;
+  }
+
+  .table-container td[data-label]::before {
+    content: attr(data-label);
+    font-weight: 600;
+    font-size: 0.78em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--secondary-text-color);
+    min-width: 48px;
+    flex-shrink: 0;
+    padding-top: 3px;
+  }
+
+  .table-container .star-td {
+    padding: 2px 0;
+  }
+
+  .table-container .actions-td {
+    margin-top: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--divider-color);
+  }
+
+  .table-container .row-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .table-container .row-actions button {
+    padding: 6px 10px;
+    font-size: 1em;
   }
 }

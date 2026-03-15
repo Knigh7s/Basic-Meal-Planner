@@ -563,11 +563,11 @@ class MealPlannerApp {
       });
 
       html += '<tr>';
-      html += `<td>${this.formatDate(meal.date)}</td>`;
-      html += `<td><span class="badge badge-secondary">${this.capitalize(meal.meal_time)}</span></td>`;
-      html += `<td>${this.escapeHtml(meal.name)}</td>`;
-      html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
-      html += `<td><div class="row-actions">
+      html += `<td data-label="Date">${this.formatDate(meal.date)}</td>`;
+      html += `<td data-label="Time"><span class="badge badge-secondary">${this.capitalize(meal.meal_time)}</span></td>`;
+      html += `<td data-label="Meal">${this.escapeHtml(meal.name)}</td>`;
+      html += `<td data-label="Notes">${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
+      html += `<td class="actions-td"><div class="row-actions">
         <button class="${meal.recipe_url ? 'recipe-link btn-primary' : 'btn-recipe-disabled'}" ${meal.recipe_url ? `data-url="${this.escapeHtml(meal.recipe_url)}"` : 'disabled'} title="${meal.recipe_url ? 'View Recipe' : 'No recipe'}">📖</button>
         <button class="edit-meal-btn btn-edit" data-meal='${this.escapeHtml(mealData)}' title="Edit">✏️</button>
         <button class="delete-meal-btn btn-danger" data-meal='${this.escapeHtml(mealData)}' title="Delete">🗑️</button>
@@ -641,10 +641,10 @@ class MealPlannerApp {
       const starIcon = isPotential ? '⭐' : '☆';
 
       html += `<tr${rowClass}>`;
-      html += `<td style="text-align:center;padding:8px 4px"><button class="${starClass} toggle-potential-btn" data-lib='${this.escapeHtml(libData)}' title="${starTitle}">${starIcon}</button></td>`;
-      html += `<td>${this.escapeHtml(meal.name)}</td>`;
-      html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
-      html += `<td><div class="row-actions">
+      html += `<td class="star-td"><button class="${starClass} toggle-potential-btn" data-lib='${this.escapeHtml(libData)}' title="${starTitle}">${starIcon}</button></td>`;
+      html += `<td data-label="Meal">${this.escapeHtml(meal.name)}</td>`;
+      html += `<td data-label="Notes">${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
+      html += `<td class="actions-td"><div class="row-actions">
         <button class="${meal.recipe_url ? 'recipe-link btn-primary' : 'btn-recipe-disabled'}" ${meal.recipe_url ? `data-url="${this.escapeHtml(meal.recipe_url)}"` : 'disabled'} title="${meal.recipe_url ? 'View Recipe' : 'No recipe'}">📖</button>
         <button class="edit-library-btn btn-edit" data-lib='${this.escapeHtml(libData)}' title="Edit">✏️</button>
         <button class="delete-library-meal-btn btn-danger" data-lib='${this.escapeHtml(libData)}' title="Delete">🗑️</button>
