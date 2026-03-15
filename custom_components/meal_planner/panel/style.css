@@ -208,6 +208,38 @@ body {
   box-shadow: 0 2px 4px rgba(219, 68, 55, 0.3);
 }
 
+.btn-edit {
+  background: #43a047;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-edit:hover {
+  opacity: 0.9;
+  box-shadow: 0 2px 4px rgba(67, 160, 71, 0.3);
+}
+
+.btn-recipe-disabled {
+  background: #616161;
+  color: #ccc;
+  border: none;
+  border-radius: 4px;
+  cursor: default;
+  display: inline-flex;
+  align-items: center;
+}
+
 /* Potential Meal Toggle */
 .btn-potential {
   background: transparent;
@@ -237,10 +269,6 @@ body {
   background: rgba(240, 180, 41, 0.08);
 }
 
-.potential-row td:first-child::before {
-  content: '⭐ ';
-  font-size: 12px;
-}
 
 /* Library filter select */
 .library-filter-select {
@@ -393,6 +421,7 @@ td {
   color: var(--primary-text-color);
   overflow-wrap: break-word;
   word-break: break-word;
+  overflow: hidden;
 }
 
 tbody tr:hover {

@@ -542,7 +542,7 @@ class MealPlannerApp {
     }
 
     let html = '<div class="table-container"><table>';
-    html += '<colgroup><col style="width:14%"><col style="width:10%"><col style="width:35%"><col style="width:30%"><col style="width:11%"></colgroup>';
+    html += '<colgroup><col style="width:14%"><col style="width:10%"><col style="width:33%"><col style="width:27%"><col style="width:16%"></colgroup>';
     html += '<thead><tr>';
     html += '<th>Date</th>';
     html += '<th>Meal Time</th>';
@@ -568,8 +568,8 @@ class MealPlannerApp {
       html += `<td>${this.escapeHtml(meal.name)}</td>`;
       html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td><div class="row-actions">
-        <button class="${meal.recipe_url ? 'recipe-link btn-primary' : 'btn-secondary'}" ${meal.recipe_url ? `data-url="${this.escapeHtml(meal.recipe_url)}"` : 'disabled'} title="${meal.recipe_url ? 'View Recipe' : 'No recipe'}">📖</button>
-        <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}' title="Edit">✏️</button>
+        <button class="${meal.recipe_url ? 'recipe-link btn-primary' : 'btn-recipe-disabled'}" ${meal.recipe_url ? `data-url="${this.escapeHtml(meal.recipe_url)}"` : 'disabled'} title="${meal.recipe_url ? 'View Recipe' : 'No recipe'}">📖</button>
+        <button class="edit-meal-btn btn-edit" data-meal='${this.escapeHtml(mealData)}' title="Edit">✏️</button>
         <button class="delete-meal-btn btn-danger" data-meal='${this.escapeHtml(mealData)}' title="Delete">🗑️</button>
       </div></td>`;
       html += '</tr>';
@@ -645,8 +645,8 @@ class MealPlannerApp {
       html += `<td>${this.escapeHtml(meal.name)}</td>`;
       html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td><div class="row-actions">
-        <button class="${meal.recipe_url ? 'recipe-link btn-primary' : 'btn-secondary'}" ${meal.recipe_url ? `data-url="${this.escapeHtml(meal.recipe_url)}"` : 'disabled'} title="${meal.recipe_url ? 'View Recipe' : 'No recipe'}">📖</button>
-        <button class="edit-library-btn btn-primary" data-lib='${this.escapeHtml(libData)}' title="Edit">✏️</button>
+        <button class="${meal.recipe_url ? 'recipe-link btn-primary' : 'btn-recipe-disabled'}" ${meal.recipe_url ? `data-url="${this.escapeHtml(meal.recipe_url)}"` : 'disabled'} title="${meal.recipe_url ? 'View Recipe' : 'No recipe'}">📖</button>
+        <button class="edit-library-btn btn-edit" data-lib='${this.escapeHtml(libData)}' title="Edit">✏️</button>
         <button class="delete-library-meal-btn btn-danger" data-lib='${this.escapeHtml(libData)}' title="Delete">🗑️</button>
       </div></td>`;
       html += '</tr>';
@@ -907,12 +907,9 @@ class MealPlannerApp {
   // Utility functions
   formatDate(dateStr) {
     const date = new Date(dateStr + 'T00:00:00');
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+    const monthDay = date.toLocaleDateString('en-US', { month: 'long', day: '2-digit' });
+    return `${weekday}<br>${monthDay}`;
   }
 
   capitalize(str) {
