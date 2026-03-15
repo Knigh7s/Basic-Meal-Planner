@@ -358,7 +358,16 @@ body {
 
 table {
   width: 100%;
+  min-width: 650px;
   border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.row-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: nowrap;
 }
 
 thead {
@@ -380,6 +389,8 @@ td {
   padding: 12px;
   border-bottom: 1px solid var(--divider-color);
   color: var(--primary-text-color);
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 tbody tr:hover {
