@@ -542,7 +542,7 @@ class MealPlannerApp {
     }
 
     let html = '<div class="table-container"><table>';
-    html += '<colgroup><col style="width:13%"><col style="width:10%"><col style="width:24%"><col style="width:12%"><col style="width:22%"><col style="width:19%"></colgroup>';
+    html += '<colgroup><col style="width:13%"><col style="width:10%"><col style="width:28%"><col style="width:12%"><col style="width:27%"><col style="width:10%"></colgroup>';
     html += '<thead><tr>';
     html += '<th>Date</th>';
     html += '<th>Meal Time</th>';
@@ -570,8 +570,8 @@ class MealPlannerApp {
       html += `<td>${meal.recipe_url ? `<a href="#" class="recipe-link" data-url="${this.escapeHtml(meal.recipe_url)}">View Recipe</a>` : '-'}</td>`;
       html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td><div class="row-actions">
-        <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}'>✏️ Edit</button>
-        <button class="delete-meal-btn btn-danger" data-meal='${this.escapeHtml(mealData)}'>🗑️ Delete</button>
+        <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}' title="Edit">✏️</button>
+        <button class="delete-meal-btn btn-danger" data-meal='${this.escapeHtml(mealData)}' title="Delete">🗑️</button>
       </div></td>`;
       html += '</tr>';
     });
@@ -618,7 +618,7 @@ class MealPlannerApp {
     }
 
     let html = '<div class="table-container"><table>';
-    html += '<colgroup><col style="width:28%"><col style="width:12%"><col style="width:28%"><col style="width:32%"></colgroup>';
+    html += '<colgroup><col style="width:33%"><col style="width:15%"><col style="width:37%"><col style="width:15%"></colgroup>';
     html += '<thead><tr>';
     html += '<th>Meal Name</th>';
     html += '<th>Recipe URL</th>';
@@ -646,8 +646,8 @@ class MealPlannerApp {
       html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td><div class="row-actions">
         <button class="${starClass} toggle-potential-btn" data-lib='${this.escapeHtml(libData)}' title="${starTitle}">⭐</button>
-        <button class="edit-library-btn btn-primary" data-lib='${this.escapeHtml(libData)}'>✏️ Edit</button>
-        <button class="delete-library-meal-btn btn-danger" data-lib='${this.escapeHtml(libData)}'>🗑️ Delete</button>
+        <button class="edit-library-btn btn-primary" data-lib='${this.escapeHtml(libData)}' title="Edit">✏️</button>
+        <button class="delete-library-meal-btn btn-danger" data-lib='${this.escapeHtml(libData)}' title="Delete">🗑️</button>
       </div></td>`;
       html += '</tr>';
     });
