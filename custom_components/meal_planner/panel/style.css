@@ -211,27 +211,25 @@ body {
 /* Potential Meal Toggle */
 .btn-potential {
   background: transparent;
-  border: 1px solid var(--divider-color);
+  border: none;
   border-radius: 4px;
-  padding: 6px 10px;
+  padding: 4px 6px;
   cursor: pointer;
   font-size: 14px;
-  opacity: 0.35;
-  transition: opacity 0.15s, box-shadow 0.15s;
+  color: var(--secondary-text-color, #aaa);
+  transition: color 0.15s;
 }
 
 .btn-potential:hover {
-  opacity: 0.7;
+  color: var(--primary-text-color);
 }
 
 .btn-potential-active {
-  opacity: 1;
-  border-color: #f0b429;
-  box-shadow: 0 0 0 2px rgba(240, 180, 41, 0.3);
+  color: #f0b429;
 }
 
 .btn-potential-active:hover {
-  opacity: 0.85;
+  color: #d49e1f;
 }
 
 /* Potential row highlight */

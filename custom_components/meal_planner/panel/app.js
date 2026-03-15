@@ -568,7 +568,7 @@ class MealPlannerApp {
       html += `<td>${this.escapeHtml(meal.name)}</td>`;
       html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td><div class="row-actions">
-        <button class="${meal.recipe_url ? 'recipe-link btn-secondary' : 'btn-secondary'}" ${meal.recipe_url ? `data-url="${this.escapeHtml(meal.recipe_url)}"` : 'disabled'} title="${meal.recipe_url ? 'View Recipe' : 'No recipe'}">📖</button>
+        <button class="${meal.recipe_url ? 'recipe-link btn-primary' : 'btn-secondary'}" ${meal.recipe_url ? `data-url="${this.escapeHtml(meal.recipe_url)}"` : 'disabled'} title="${meal.recipe_url ? 'View Recipe' : 'No recipe'}">📖</button>
         <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}' title="Edit">✏️</button>
         <button class="delete-meal-btn btn-danger" data-meal='${this.escapeHtml(mealData)}' title="Delete">🗑️</button>
       </div></td>`;
@@ -617,8 +617,9 @@ class MealPlannerApp {
     }
 
     let html = '<div class="table-container"><table>';
-    html += '<colgroup><col style="width:37%"><col style="width:49%"><col style="width:14%"></colgroup>';
+    html += '<colgroup><col style="width:5%"><col style="width:34%"><col style="width:48%"><col style="width:13%"></colgroup>';
     html += '<thead><tr>';
+    html += '<th></th>';
     html += '<th>Meal Name</th>';
     html += '<th>Notes</th>';
     html += '<th>Actions</th>';
@@ -637,13 +638,14 @@ class MealPlannerApp {
       const rowClass = isPotential ? ' class="potential-row"' : '';
       const starClass = isPotential ? 'btn-potential btn-potential-active' : 'btn-potential';
       const starTitle = isPotential ? 'Remove Potential Meal' : 'Mark as a Potential Meal';
+      const starIcon = isPotential ? '⭐' : '☆';
 
       html += `<tr${rowClass}>`;
+      html += `<td style="text-align:center;padding:8px 4px"><button class="${starClass} toggle-potential-btn" data-lib='${this.escapeHtml(libData)}' title="${starTitle}">${starIcon}</button></td>`;
       html += `<td>${this.escapeHtml(meal.name)}</td>`;
       html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td><div class="row-actions">
-        <button class="${starClass} toggle-potential-btn" data-lib='${this.escapeHtml(libData)}' title="${starTitle}">⭐</button>
-        <button class="${meal.recipe_url ? 'recipe-link btn-secondary' : 'btn-secondary'}" ${meal.recipe_url ? `data-url="${this.escapeHtml(meal.recipe_url)}"` : 'disabled'} title="${meal.recipe_url ? 'View Recipe' : 'No recipe'}">📖</button>
+        <button class="${meal.recipe_url ? 'recipe-link btn-primary' : 'btn-secondary'}" ${meal.recipe_url ? `data-url="${this.escapeHtml(meal.recipe_url)}"` : 'disabled'} title="${meal.recipe_url ? 'View Recipe' : 'No recipe'}">📖</button>
         <button class="edit-library-btn btn-primary" data-lib='${this.escapeHtml(libData)}' title="Edit">✏️</button>
         <button class="delete-library-meal-btn btn-danger" data-lib='${this.escapeHtml(libData)}' title="Delete">🗑️</button>
       </div></td>`;
