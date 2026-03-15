@@ -568,7 +568,7 @@ class MealPlannerApp {
       html += `<td data-label="Meal">${this.escapeHtml(meal.name)}</td>`;
       html += `<td data-label="Notes">${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td class="actions-td"><div class="row-actions">
-        <button class="${meal.recipe_url ? 'recipe-link btn-primary' : 'btn-recipe-disabled'}" ${meal.recipe_url ? `data-url="${this.escapeHtml(meal.recipe_url)}"` : 'disabled'} title="${meal.recipe_url ? 'View Recipe' : 'No recipe'}">📖</button>
+        <button class="${meal.recipe_url ? 'recipe-link btn-recipe' : 'btn-recipe-disabled'}" ${meal.recipe_url ? `data-url="${this.escapeHtml(meal.recipe_url)}"` : 'disabled'} title="${meal.recipe_url ? 'View Recipe' : 'No recipe'}">📖</button>
         <button class="edit-meal-btn btn-edit" data-meal='${this.escapeHtml(mealData)}' title="Edit">✏️</button>
         <button class="delete-meal-btn btn-danger" data-meal='${this.escapeHtml(mealData)}' title="Delete">🗑️</button>
       </div></td>`;
@@ -645,7 +645,7 @@ class MealPlannerApp {
       html += `<td data-label="Meal">${this.escapeHtml(meal.name)}</td>`;
       html += `<td data-label="Notes">${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td class="actions-td"><div class="row-actions">
-        <button class="${meal.recipe_url ? 'recipe-link btn-primary' : 'btn-recipe-disabled'}" ${meal.recipe_url ? `data-url="${this.escapeHtml(meal.recipe_url)}"` : 'disabled'} title="${meal.recipe_url ? 'View Recipe' : 'No recipe'}">📖</button>
+        <button class="${meal.recipe_url ? 'recipe-link btn-recipe' : 'btn-recipe-disabled'}" ${meal.recipe_url ? `data-url="${this.escapeHtml(meal.recipe_url)}"` : 'disabled'} title="${meal.recipe_url ? 'View Recipe' : 'No recipe'}">📖</button>
         <button class="edit-library-btn btn-edit" data-lib='${this.escapeHtml(libData)}' title="Edit">✏️</button>
         <button class="delete-library-meal-btn btn-danger" data-lib='${this.escapeHtml(libData)}' title="Delete">🗑️</button>
       </div></td>`;
