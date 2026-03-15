@@ -542,12 +542,11 @@ class MealPlannerApp {
     }
 
     let html = '<div class="table-container"><table>';
-    html += '<colgroup><col style="width:13%"><col style="width:10%"><col style="width:28%"><col style="width:12%"><col style="width:27%"><col style="width:10%"></colgroup>';
+    html += '<colgroup><col style="width:14%"><col style="width:11%"><col style="width:32%"><col style="width:31%"><col style="width:12%"></colgroup>';
     html += '<thead><tr>';
     html += '<th>Date</th>';
     html += '<th>Meal Time</th>';
     html += '<th>Meal Name</th>';
-    html += '<th>Recipe URL</th>';
     html += '<th>Notes</th>';
     html += '<th>Actions</th>';
     html += '</tr></thead>';
@@ -567,9 +566,9 @@ class MealPlannerApp {
       html += `<td>${this.formatDate(meal.date)}</td>`;
       html += `<td><span class="badge badge-secondary">${this.capitalize(meal.meal_time)}</span></td>`;
       html += `<td>${this.escapeHtml(meal.name)}</td>`;
-      html += `<td>${meal.recipe_url ? `<a href="#" class="recipe-link" data-url="${this.escapeHtml(meal.recipe_url)}">View Recipe</a>` : '-'}</td>`;
       html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td><div class="row-actions">
+        ${meal.recipe_url ? `<button class="recipe-link btn-secondary" data-url="${this.escapeHtml(meal.recipe_url)}" title="View Recipe">🔗</button>` : ''}
         <button class="edit-meal-btn btn-primary" data-meal='${this.escapeHtml(mealData)}' title="Edit">✏️</button>
         <button class="delete-meal-btn btn-danger" data-meal='${this.escapeHtml(mealData)}' title="Delete">🗑️</button>
       </div></td>`;
@@ -618,10 +617,9 @@ class MealPlannerApp {
     }
 
     let html = '<div class="table-container"><table>';
-    html += '<colgroup><col style="width:33%"><col style="width:15%"><col style="width:37%"><col style="width:15%"></colgroup>';
+    html += '<colgroup><col style="width:38%"><col style="width:47%"><col style="width:15%"></colgroup>';
     html += '<thead><tr>';
     html += '<th>Meal Name</th>';
-    html += '<th>Recipe URL</th>';
     html += '<th>Notes</th>';
     html += '<th>Actions</th>';
     html += '</tr></thead>';
@@ -642,10 +640,10 @@ class MealPlannerApp {
 
       html += `<tr${rowClass}>`;
       html += `<td>${this.escapeHtml(meal.name)}</td>`;
-      html += `<td>${meal.recipe_url ? `<a href="#" class="recipe-link" data-url="${this.escapeHtml(meal.recipe_url)}">View Recipe</a>` : '-'}</td>`;
       html += `<td>${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td><div class="row-actions">
         <button class="${starClass} toggle-potential-btn" data-lib='${this.escapeHtml(libData)}' title="${starTitle}">⭐</button>
+        ${meal.recipe_url ? `<button class="recipe-link btn-secondary" data-url="${this.escapeHtml(meal.recipe_url)}" title="View Recipe">🔗</button>` : ''}
         <button class="edit-library-btn btn-primary" data-lib='${this.escapeHtml(libData)}' title="Edit">✏️</button>
         <button class="delete-library-meal-btn btn-danger" data-lib='${this.escapeHtml(libData)}' title="Delete">🗑️</button>
       </div></td>`;
