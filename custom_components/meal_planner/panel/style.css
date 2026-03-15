@@ -358,16 +358,20 @@ body {
 
 table {
   width: 100%;
-  min-width: 650px;
   border-collapse: collapse;
   table-layout: fixed;
 }
 
 .row-actions {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
   flex-wrap: nowrap;
+}
+
+.row-actions button {
+  padding: 4px 7px;
+  font-size: 0.85em;
 }
 
 thead {
