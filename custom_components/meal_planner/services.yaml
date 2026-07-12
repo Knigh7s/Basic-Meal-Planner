@@ -27,6 +27,11 @@ add:
       example: "https://example.com/alfredo"
       selector:
         text:
+    videos:
+      required: false
+      example: ["https://youtube.com/watch?v=abc123"]
+      selector:
+        object:
     notes:
       required: false
       example: "Use gluten-free pasta"
@@ -67,6 +72,11 @@ update:
       example: "https://example.com/alfredo"
       selector:
         text:
+    videos:
+      required: false
+      example: ["https://youtube.com/watch?v=abc123"]
+      selector:
+        object:
     notes:
       required: false
       example: "Use gluten-free pasta"
@@ -158,6 +168,11 @@ update_library:
       example: "https://example.com/alfredo"
       selector:
         text:
+    videos:
+      required: false
+      example: ["https://youtube.com/watch?v=abc123"]
+      selector:
+        object:
     notes:
       required: false
       example: "Use gluten-free pasta"

@@ -27,6 +27,7 @@ from .const import (
     MAX_URL_LENGTH,
     MAX_LIBRARY_SIZE,
     MAX_SCHEDULED_SIZE,
+    MAX_VIDEOS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -110,6 +111,15 @@ def _validate_url(url: str) -> str:
     # Remove null bytes
     url = url.replace("\x00", "")
     return url
+
+
+def _validate_url_list(urls) -> list:
+    """Validate and sanitize a list of URLs. Returns cleaned list, capped to MAX_VIDEOS."""
+    if not isinstance(urls, list):
+        return []
+    cleaned = [_validate_url(u) for u in urls]
+    cleaned = [u for u in cleaned if u]
+    return cleaned[:MAX_VIDEOS]
 
 
 def _sanitize_string(value: str, max_length: int, field_name: str = "field") -> str:
@@ -334,6 +344,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     for m in data["library"]:
         m.setdefault("id", uuid.uuid4().hex)
         m.setdefault("potential", False)
+        m.setdefault("videos", [])
     for m in data["scheduled"]:
         m.setdefault("id", uuid.uuid4().hex)
         m.setdefault("library_id", "")
@@ -422,6 +433,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             return
 
         recipe_url = _validate_url(call.data.get("recipe_url", ""))
+        videos = _validate_url_list(call.data.get("videos", []))
         notes = _sanitize_string(call.data.get("notes", ""), MAX_NOTES_LENGTH, "notes")
 
         # Find or create library entry
@@ -429,8 +441,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         for lib_meal in data["library"]:
             if lib_meal.get("name", "").lower() == name.lower():
                 library_entry = lib_meal
-                # Update library entry with latest recipe/notes
+                # Update library entry with latest recipe/videos/notes
                 library_entry["recipe_url"] = recipe_url
+                library_entry["videos"] = videos
                 library_entry["notes"] = notes
                 break
 
@@ -440,6 +453,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "id": uuid.uuid4().hex,
                 "name": name,
                 "recipe_url": recipe_url,
+                "videos": videos,
                 "notes": notes,
                 "potential": False,
             }
@@ -526,6 +540,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                             "id": uuid.uuid4().hex,
                             "name": new_name,
                             "recipe_url": call.data.get("recipe_url", "") if "recipe_url" in call.data else (current_lib.get("recipe_url", "") if current_lib else ""),
+                            "videos": _validate_url_list(call.data.get("videos", [])) if "videos" in call.data else (current_lib.get("videos", []) if current_lib else []),
                             "notes": call.data.get("notes", "") if "notes" in call.data else (current_lib.get("notes", "") if current_lib else "")
                         }
                         data["library"].append(new_lib)
@@ -546,6 +561,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if library_entry:
             if "recipe_url" in call.data:
                 library_entry["recipe_url"] = _validate_url(call.data.get("recipe_url", ""))
+                save_library = True
+            if "videos" in call.data:
+                library_entry["videos"] = _validate_url_list(call.data.get("videos", []))
                 save_library = True
             if "notes" in call.data:
                 library_entry["notes"] = _sanitize_string(call.data.get("notes", ""), MAX_NOTES_LENGTH, "notes")
@@ -704,6 +722,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 lib_entry["name"] = new_name
         if "recipe_url" in call.data:
             lib_entry["recipe_url"] = _validate_url(call.data.get("recipe_url", ""))
+        if "videos" in call.data:
+            lib_entry["videos"] = _validate_url_list(call.data.get("videos", []))
         if "notes" in call.data:
             lib_entry["notes"] = _sanitize_string(call.data.get("notes", ""), MAX_NOTES_LENGTH, "notes")
         if "potential" in call.data:
@@ -756,6 +776,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "date": sched.get("date", ""),
                 "meal_time": sched.get("meal_time", "Dinner"),
                 "recipe_url": library_entry.get("recipe_url", "") if library_entry else "",
+                "videos": library_entry.get("videos", []) if library_entry else [],
                 "notes": library_entry.get("notes", "") if library_entry else "",
             }
             merged_scheduled.append(merged_meal)
@@ -771,6 +792,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     "id": lib.get("id", ""),
                     "name": lib.get("name", ""),
                     "recipe_url": lib.get("recipe_url", ""),
+                    "videos": lib.get("videos", []),
                     "notes": lib.get("notes", ""),
                     "potential": lib.get("potential", False),
                 })
@@ -787,6 +809,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         vol.Optional("meal_time"): str,
         vol.Optional("date"): str,
         vol.Optional("recipe_url"): str,
+        vol.Optional("videos"): list,
         vol.Optional("notes"): str,
     })
     async def ws_add(hass, connection, msg):
@@ -795,6 +818,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "meal_time": msg.get("meal_time","Dinner"),
             "date": msg.get("date",""),
             "recipe_url": msg.get("recipe_url",""),
+            "videos": msg.get("videos",[]),
             "notes": msg.get("notes",""),
         })
         connection.send_result(msg["id"], {"success": True})
@@ -806,12 +830,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         vol.Optional("meal_time"): str,
         vol.Optional("date"): str,
         vol.Optional("recipe_url"): str,
+        vol.Optional("videos"): list,
         vol.Optional("notes"): str,
     })
     async def ws_update(hass, connection, msg):
         try:
             payload = {"row_id": msg.get("row_id", "")}
-            for k in ("name", "meal_time", "date", "recipe_url", "notes"):
+            for k in ("name", "meal_time", "date", "recipe_url", "videos", "notes"):
                 if k in msg:
                     payload[k] = msg.get(k, "")
             await hass.services.async_call(DOMAIN, "update", payload)
@@ -859,12 +884,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         vol.Required("library_id"): str,
         vol.Optional("name"): str,
         vol.Optional("recipe_url"): str,
+        vol.Optional("videos"): list,
         vol.Optional("notes"): str,
         vol.Optional("potential"): bool,
     })
     async def ws_update_library(hass, connection, msg):
         payload = {"library_id": msg.get("library_id", "")}
-        for k in ("name", "recipe_url", "notes"):
+        for k in ("name", "recipe_url", "videos", "notes"):
             if k in msg:
                 payload[k] = msg.get(k, "")
         if "potential" in msg:

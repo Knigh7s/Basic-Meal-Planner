@@ -609,6 +609,50 @@ td a:hover {
   min-height: 80px;
 }
 
+/* Video list (Add/Edit Meal modal) */
+#video-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.video-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.video-row .video-url-input {
+  flex: 1;
+  width: auto;
+}
+
+.video-row .remove-video-btn {
+  padding: 8px 12px;
+  font-size: 1.1em;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* Video popup list (list/dashboard views) */
+.video-popup-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.video-popup-list a {
+  color: var(--primary-color);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.video-popup-list a:hover {
+  text-decoration: underline;
+}
+
 .checkbox-label {
   display: flex;
   align-items: center;

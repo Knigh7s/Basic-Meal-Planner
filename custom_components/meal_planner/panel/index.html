@@ -123,6 +123,12 @@
           </div>
 
           <div class="form-group">
+            <label>Videos</label>
+            <div id="video-list"></div>
+            <button type="button" id="add-video-btn" class="btn-secondary">+ Add Video</button>
+          </div>
+
+          <div class="form-group">
             <label for="meal-notes">Notes</label>
             <textarea id="meal-notes" rows="3" maxlength="500"></textarea>
           </div>
@@ -168,6 +174,20 @@
             <button type="submit" class="btn-primary">Save Settings</button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Video List Modal -->
+  <div id="video-popup-modal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Videos</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <ul id="video-popup-list" class="video-popup-list"></ul>
       </div>
     </div>
   </div>

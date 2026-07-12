@@ -279,6 +279,31 @@ class MealPlannerApp {
     });
   }
 
+  showVideoPopup(videos) {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('video-popup-modal');
+      const listEl = document.getElementById('video-popup-list');
+      const closeBtn = modal.querySelector('.modal-close');
+      const overlay = modal.querySelector('.modal-overlay');
+
+      listEl.innerHTML = (videos || []).map((url, i) => `
+        <li><a href="#" class="video-popup-link" data-url="${this.escapeHtml(url)}">Video ${i + 1}: ${this.escapeHtml(url)}</a></li>
+      `).join('');
+
+      modal.classList.remove('hidden');
+
+      const closeModal = () => {
+        modal.classList.add('hidden');
+        closeBtn.removeEventListener('click', closeModal);
+        overlay.removeEventListener('click', closeModal);
+        resolve();
+      };
+
+      closeBtn.addEventListener('click', closeModal);
+      overlay.addEventListener('click', closeModal);
+    });
+  }
+
   async addMeal(meal) {
     if (!this.hass) {
       console.warn('[Meal Planner] No HASS connection - cannot add meal');
@@ -397,6 +422,36 @@ class MealPlannerApp {
       this.handleFormSubmit();
     });
 
+    // Add Video button
+    const addVideoBtn = document.getElementById('add-video-btn');
+    if (addVideoBtn) {
+      addVideoBtn.addEventListener('click', () => this.addVideoRow());
+    }
+
+    // Remove Video buttons (delegated — rows are added/removed dynamically)
+    const videoList = document.getElementById('video-list');
+    if (videoList) {
+      videoList.addEventListener('click', (e) => {
+        const removeBtn = e.target.closest('.remove-video-btn');
+        if (removeBtn) {
+          removeBtn.closest('.video-row').remove();
+        }
+      });
+    }
+
+    // Video popup links (companion app compatible — window.top breaks out of iframe)
+    const videoPopupList = document.getElementById('video-popup-list');
+    if (videoPopupList) {
+      videoPopupList.addEventListener('click', (e) => {
+        const link = e.target.closest('.video-popup-link');
+        if (link) {
+          e.preventDefault();
+          const url = link.dataset.url;
+          if (url) window.top.open(url, '_blank', 'noopener noreferrer');
+        }
+      });
+    }
+
     // Settings Modal controls
     const settingsModal = document.getElementById('settings-modal');
     const settingsModalClose = settingsModal.querySelector('.modal-close');
@@ -468,6 +523,13 @@ class MealPlannerApp {
         const link = target.classList.contains('recipe-link') ? target : target.closest('.recipe-link');
         const url = link.dataset.url;
         if (url) window.top.open(url, '_blank', 'noopener noreferrer');
+      }
+
+      // Open video list popup
+      if (target.classList.contains('video-list-btn') || target.closest('.video-list-btn')) {
+        const btn = target.classList.contains('video-list-btn') ? target : target.closest('.video-list-btn');
+        const videos = JSON.parse(btn.getAttribute('data-videos') || '[]');
+        this.showVideoPopup(videos);
       }
 
     });
@@ -559,8 +621,10 @@ class MealPlannerApp {
         date: meal.date,
         meal_time: meal.meal_time,
         recipe_url: meal.recipe_url || '',
+        videos: meal.videos || [],
         notes: meal.notes || ''
       });
+      const hasVideos = meal.videos && meal.videos.length > 0;
 
       html += '<tr>';
       html += `<td data-label="Date">${this.formatDate(meal.date)}</td>`;
@@ -569,6 +633,7 @@ class MealPlannerApp {
       html += `<td data-label="Notes">${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td class="actions-td"><div class="row-actions">
         <button class="${meal.recipe_url ? 'recipe-link btn-recipe' : 'btn-recipe-disabled'}" ${meal.recipe_url ? `data-url="${this.escapeHtml(meal.recipe_url)}"` : 'disabled'} title="${meal.recipe_url ? 'View Recipe' : 'No recipe'}">📖</button>
+        <button class="${hasVideos ? 'video-list-btn btn-recipe' : 'btn-recipe-disabled'}" ${hasVideos ? `data-videos='${this.escapeHtml(JSON.stringify(meal.videos))}'` : 'disabled'} title="${hasVideos ? 'View Videos' : 'No videos'}">🎥</button>
         <button class="edit-meal-btn btn-edit" data-meal='${this.escapeHtml(mealData)}' title="Edit">✏️</button>
         <button class="delete-meal-btn btn-danger" data-meal='${this.escapeHtml(mealData)}' title="Delete">🗑️</button>
       </div></td>`;
@@ -631,6 +696,7 @@ class MealPlannerApp {
         library_id: meal.id,
         name: meal.name,
         recipe_url: meal.recipe_url || '',
+        videos: meal.videos || [],
         notes: meal.notes || '',
         potential: meal.potential || false
       });
@@ -639,6 +705,7 @@ class MealPlannerApp {
       const starClass = isPotential ? 'btn-potential btn-potential-active' : 'btn-potential';
       const starTitle = isPotential ? 'Remove Potential Meal' : 'Mark as a Potential Meal';
       const starIcon = isPotential ? '⭐' : '☆';
+      const hasVideos = meal.videos && meal.videos.length > 0;
 
       html += `<tr${rowClass}>`;
       html += `<td class="star-td"><button class="${starClass} toggle-potential-btn" data-lib='${this.escapeHtml(libData)}' title="${starTitle}">${starIcon}</button></td>`;
@@ -646,6 +713,7 @@ class MealPlannerApp {
       html += `<td data-label="Notes">${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td class="actions-td"><div class="row-actions">
         <button class="${meal.recipe_url ? 'recipe-link btn-recipe' : 'btn-recipe-disabled'}" ${meal.recipe_url ? `data-url="${this.escapeHtml(meal.recipe_url)}"` : 'disabled'} title="${meal.recipe_url ? 'View Recipe' : 'No recipe'}">📖</button>
+        <button class="${hasVideos ? 'video-list-btn btn-recipe' : 'btn-recipe-disabled'}" ${hasVideos ? `data-videos='${this.escapeHtml(JSON.stringify(meal.videos))}'` : 'disabled'} title="${hasVideos ? 'View Videos' : 'No videos'}">🎥</button>
         <button class="edit-library-btn btn-edit" data-lib='${this.escapeHtml(libData)}' title="Edit">✏️</button>
         <button class="delete-library-meal-btn btn-danger" data-lib='${this.escapeHtml(libData)}' title="Delete">🗑️</button>
       </div></td>`;
@@ -689,8 +757,26 @@ class MealPlannerApp {
     document.getElementById('meal-time').value = 'Dinner';
     document.getElementById('meal-recipe').value = libData.recipe_url || '';
     document.getElementById('meal-notes').value = libData.notes || '';
+    this.populateVideoRows(libData.videos);
 
     modal.classList.remove('hidden');
+  }
+
+  addVideoRow(url = '') {
+    const list = document.getElementById('video-list');
+    const row = document.createElement('div');
+    row.className = 'video-row';
+    row.innerHTML = `
+      <input type="url" class="video-url-input" maxlength="2048" placeholder="https://..." value="${this.escapeHtml(url)}">
+      <button type="button" class="remove-video-btn btn-secondary" title="Remove">&times;</button>
+    `;
+    list.appendChild(row);
+  }
+
+  populateVideoRows(videos) {
+    document.getElementById('video-list').innerHTML = '';
+    const rows = (videos && videos.length) ? videos : [''];
+    rows.forEach(v => this.addVideoRow(v));
   }
 
   openMealModal(hideScheduleFields = false, mealData = null) {
@@ -721,6 +807,7 @@ class MealPlannerApp {
       // Leave date blank - user chooses if they want to schedule it
       document.getElementById('meal-date').value = '';
     }
+    this.populateVideoRows(mealData ? mealData.videos : null);
 
     modal.classList.remove('hidden');
   }
@@ -756,6 +843,9 @@ class MealPlannerApp {
       const mealTime = document.getElementById('meal-time').value;
       const recipe = document.getElementById('meal-recipe').value.trim();
       const notes = document.getElementById('meal-notes').value.trim();
+      const videos = Array.from(document.querySelectorAll('#video-list .video-url-input'))
+        .map(input => input.value.trim())
+        .filter(url => url);
 
       if (!name) {
         await this.showAlert('Please enter a meal name');
@@ -767,21 +857,23 @@ class MealPlannerApp {
         date: date || '',
         meal_time: mealTime,
         recipe_url: recipe || '',
+        videos,
         notes: notes || ''
       };
 
       let success = false;
 
       if (this.editingLibraryId) {
-        // Update library entry (name/recipe/notes)
+        // Update library entry (name/recipe/videos/notes)
         success = await this.updateLibraryEntry(this.editingLibraryId, {
           name,
           recipe_url: recipe || '',
+          videos,
           notes: notes || ''
         });
         // If a date was also provided, create a scheduled entry
         if (success && date) {
-          success = await this.addMeal({ name, date, meal_time: mealTime, recipe_url: recipe || '', notes: notes || '' });
+          success = await this.addMeal({ name, date, meal_time: mealTime, recipe_url: recipe || '', videos, notes: notes || '' });
         }
       } else if (this.editingMeal && this.editingMeal.id) {
         // Update an existing scheduled entry
