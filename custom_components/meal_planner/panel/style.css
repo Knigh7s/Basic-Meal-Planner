@@ -497,7 +497,7 @@ td a:hover {
   background: var(--card-background-color, #fff);
   border-radius: 16px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-  max-width: 600px;
+  max-width: 760px;
   width: 90%;
   max-height: 90vh;
   overflow-y: auto;
@@ -566,6 +566,23 @@ td a:hover {
 /* Form */
 .form-group {
   margin-bottom: 20px;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+}
+
+.form-row .form-group {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
 }
 
 .form-group label {
