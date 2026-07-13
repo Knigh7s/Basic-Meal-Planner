@@ -58,7 +58,7 @@ class MealPlannerWeeklyHorizontal extends HTMLElement {
       mealTimes.push('snack');
     }
     if (this.config.show_beverages) {
-      mealTimes.push('beverages');
+      mealTimes.push('beverage');
     }
 
     // Build table

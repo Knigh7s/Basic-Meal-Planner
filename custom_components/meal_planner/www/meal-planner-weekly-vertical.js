@@ -58,7 +58,7 @@ class MealPlannerWeeklyVertical extends HTMLElement {
       mealTimes.push('snack');
     }
     if (this.config.show_beverages) {
-      mealTimes.push('beverages');
+      mealTimes.push('beverage');
     }
 
     let html = '<div class="day-list">';

@@ -42,7 +42,7 @@ DEFAULT_DATA = {
     "library": [],    # list of {name, recipe_url, notes}
 }
 
-MEAL_TIME_ORDER = {"Breakfast": 0, "Lunch": 1, "Dinner": 2, "Snack": 3, "Beverages": 4}
+MEAL_TIME_ORDER = {"Breakfast": 0, "Lunch": 1, "Dinner": 2, "Snack": 3, "Beverage": 4}
 
 
 def _current_week_bounds(today: date, week_start: str) -> tuple[date, date]:
@@ -463,7 +463,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         # Validate schedule info
         meal_time = (call.data.get("meal_time") or "Dinner").strip().title()
-        if meal_time not in ("Breakfast", "Lunch", "Dinner", "Snack", "Beverages"):
+        if meal_time not in ("Breakfast", "Lunch", "Dinner", "Snack", "Beverage"):
             meal_time = "Dinner"
 
         date_str = call.data.get("date", "")
@@ -570,7 +570,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 save_library = True
 
         # Update scheduled entry (date, meal_time, potential)
-        valid_times = ("Breakfast", "Lunch", "Dinner", "Snack", "Beverages")
+        valid_times = ("Breakfast", "Lunch", "Dinner", "Snack", "Beverage")
         if "meal_time" in call.data:
             mt = (call.data.get("meal_time") or "").strip().title()
             if mt in valid_times:
@@ -629,7 +629,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             elif action == "assign_date":
                 if date_str:
                     m["date"] = date_str
-                if meal_time_in in ("Breakfast", "Lunch", "Dinner", "Snack", "Beverages"):
+                if meal_time_in in ("Breakfast", "Lunch", "Dinner", "Snack", "Beverage"):
                     m["meal_time"] = meal_time_in
                 new_list.append(m)
 
