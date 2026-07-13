@@ -134,7 +134,8 @@ class WeeklyMealsSensor(SensorEntity):
                 "breakfast": "",
                 "lunch": "",
                 "dinner": "",
-                "snack": ""
+                "snack": "",
+                "beverages": ""
             }
 
         # Populate meals
@@ -153,7 +154,7 @@ class WeeklyMealsSensor(SensorEntity):
                 if 0 <= days_diff < total_days:
                     day_key = f"day{days_diff}"
                     slot = (m.get("meal_time") or "Dinner").strip().lower()
-                    if slot in ("breakfast", "lunch", "dinner", "snack"):
+                    if slot in ("breakfast", "lunch", "dinner", "snack", "beverages"):
                         # Look up meal name from library
                         library_entry = library_map.get(m.get("library_id"))
                         if library_entry:

@@ -607,7 +607,7 @@ class MealPlannerApp {
     html += '<colgroup><col style="width:14%"><col style="width:10%"><col style="width:33%"><col style="width:27%"><col style="width:16%"></colgroup>';
     html += '<thead><tr>';
     html += '<th>Date</th>';
-    html += '<th>Meal Time</th>';
+    html += '<th>Meal Type</th>';
     html += '<th>Meal Name</th>';
     html += '<th>Notes</th>';
     html += '<th>Actions</th>';
@@ -628,7 +628,7 @@ class MealPlannerApp {
 
       html += '<tr>';
       html += `<td data-label="Date">${this.formatDate(meal.date)}</td>`;
-      html += `<td data-label="Time"><span class="badge badge-secondary">${this.capitalize(meal.meal_time)}</span></td>`;
+      html += `<td data-label="Type"><span class="badge badge-secondary">${this.capitalize(meal.meal_time)}</span></td>`;
       html += `<td data-label="Meal">${this.escapeHtml(meal.name)}</td>`;
       html += `<td data-label="Notes">${meal.notes ? this.escapeHtml(meal.notes) : '-'}</td>`;
       html += `<td class="actions-td"><div class="row-actions">

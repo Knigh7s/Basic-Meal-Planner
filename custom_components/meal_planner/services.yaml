@@ -17,6 +17,7 @@ add:
             - Lunch
             - Dinner
             - Snack
+            - Beverages
     date:
       required: false
       example: "2025-10-31"
@@ -62,6 +63,7 @@ update:
             - Lunch
             - Dinner
             - Snack
+            - Beverages
     date:
       required: false
       example: "2025-10-31"
@@ -136,6 +138,8 @@ bulk:
             - Breakfast
             - Lunch
             - Dinner
+            - Snack
+            - Beverages
 
 clear_potential:
   name: Clear potential meals
