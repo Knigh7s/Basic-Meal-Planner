@@ -9,7 +9,6 @@ class MealPlannerWeeklyVertical extends HTMLElement {
       week_start: (config && config.week_start) || 'Sunday',
       compact: (config && config.compact) || false,
       show_snacks: (config && config.show_snacks !== false) !== false,
-      show_beverages: (config && config.show_beverages !== false) !== false,
       title: (config && config.title) || 'Meal Plan'
     };
 
@@ -56,9 +55,6 @@ class MealPlannerWeeklyVertical extends HTMLElement {
     const mealTimes = ['breakfast', 'lunch', 'dinner'];
     if (this.config.show_snacks) {
       mealTimes.push('snack');
-    }
-    if (this.config.show_beverages) {
-      mealTimes.push('beverage');
     }
 
     let html = '<div class="day-list">';
@@ -145,7 +141,6 @@ class MealPlannerWeeklyVertical extends HTMLElement {
       entity: 'sensor.meal_planner_week',
       title: 'Meal Plan',
       show_snacks: true,
-      show_beverages: true,
       compact: false
     };
   }
@@ -316,10 +311,6 @@ class MealPlannerWeeklyVerticalEditor extends HTMLElement {
         <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;">
           <label style="font-size:0.95em;">Show Snacks</label>
           <input type="checkbox" name="show_snacks" ${cfg.show_snacks !== false ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary-color);">
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;">
-          <label style="font-size:0.95em;">Show Beverages</label>
-          <input type="checkbox" name="show_beverages" ${cfg.show_beverages !== false ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary-color);">
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;">
           <label style="font-size:0.95em;">Compact Mode</label>
